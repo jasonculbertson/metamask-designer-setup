@@ -445,8 +445,13 @@ export class SetupRunner {
     )
 
     // ── Step 5: Launch Refine AI ──
+    // Small delay so macOS finishes processing the MetaMask deep link first
+    await new Promise(r => setTimeout(r, 2000))
     log('Launching Refine AI...')
-    await runShell('open -a "Refine AI"', log, undefined, this.env)
+    await runShell(
+      'open -a "Refine AI" && sleep 1 && osascript -e \'tell application "Refine AI" to activate\' 2>/dev/null || true',
+      log, undefined, this.env
+    )
 
     this.state.setupComplete = true
     this.saveState()
