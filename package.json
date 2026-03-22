@@ -5,6 +5,7 @@
   "main": "dist/main.js",
   "scripts": {
     "postinstall": "npx playwright install chromium",
+    "prebuild": "node scripts/copy-chromium.js",
     "build": "tsc",
     "start": "npm run build && npx electron .",
     "dist": "npm run build && electron-builder --mac"
@@ -17,7 +18,7 @@
       "category": "public.app-category.developer-tools",
       "icon": "assets/icon.icns",
       "target": [
-        { "target": "dmg", "arch": ["arm64", "x64"] }
+        { "target": "dmg", "arch": ["arm64"] }
       ],
       "hardenedRuntime": false,
       "gatekeeperAssess": false
@@ -37,8 +38,8 @@
     ],
     "extraResources": [
       {
-        "from": "node_modules/playwright-core/.local-chromium",
-        "to": "chromium",
+        "from": "chromium-bundle",
+        "to": "chromium-bundle",
         "filter": ["**/*"]
       }
     ],

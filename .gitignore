@@ -1,4 +1,5 @@
 node_modules/
+chromium-bundle/
 dist/
 dist-app/
 *.js.map

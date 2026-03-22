@@ -555,10 +555,21 @@ function showRunningError(msg) {
 async function startSetup() {
   state = await api.getState()
 
-  // If already fully set up, skip to launch
+  // Already set up — check for a newer build then launch
   if (state.setupComplete) {
     showScreen('running')
-    runStep('launch')
+    resetStepUI()
+    const buildResult = await api.runStep('download-build')
+    if (!buildResult.ok) {
+      showRunningError('Build check failed: ' + (buildResult.error || ''))
+      return
+    }
+    const launchResult = await api.runStep('launch')
+    if (!launchResult.ok) {
+      showRunningError(launchResult.error || 'Launch failed')
+      return
+    }
+    showScreen('done')
     return
   }
 
@@ -641,18 +652,23 @@ async function runStep(stepId) {
   showScreen('done')
 }
 
-async function launchAgain() {
-  showScreen('running')
-  // Reset step UI
+function resetStepUI() {
+  const emojis = { prereqs: '📦', repo: '📂', deps: '🧶', build: '📲', launch: '🚀' }
   document.querySelectorAll('.step').forEach(s => {
     s.className = 'step'
     const icon = s.querySelector('.step-icon')
-    const emojis = { prereqs: '📦', repo: '📂', deps: '🧶', build: '📲', launch: '🚀' }
     const id = s.id.replace('step-', '')
     if (icon) icon.textContent = emojis[id] || '•'
+    const status = document.getElementById('step-' + id + '-status')
+    if (status) status.textContent = ''
   })
   document.getElementById('log-view').innerHTML = ''
   document.getElementById('running-error').classList.remove('visible')
+}
+
+async function launchAgain() {
+  showScreen('running')
+  resetStepUI()
   runFullSetup()
 }
 </script>
