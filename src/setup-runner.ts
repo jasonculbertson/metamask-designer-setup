@@ -1,4 +1,4 @@
-import { execSync, spawn } from 'child_process'
+import { spawn } from 'child_process'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
@@ -16,12 +16,54 @@ interface State {
   setupComplete?: boolean
 }
 
-function exec(cmd: string, opts?: { cwd?: string }): string {
-  return execSync(cmd, { encoding: 'utf8', cwd: opts?.cwd }).trim()
+// Async exec that streams stdout/stderr lines to the log
+function run(
+  cmd: string,
+  args: string[],
+  opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {}
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(cmd, args, {
+      cwd: opts.cwd,
+      env: { ...process.env, ...opts.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    proc.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`${cmd} exited with code ${code}`))))
+    proc.on('error', reject)
+  })
+}
+
+function runWithLog(
+  cmd: string,
+  args: string[],
+  log: (msg: string) => void,
+  opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {}
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(cmd, args, {
+      cwd: opts.cwd,
+      env: { ...process.env, ...opts.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    const onLine = (chunk: Buffer) => {
+      chunk.toString().split('\n').filter(Boolean).forEach(line => log(line))
+    }
+    proc.stdout?.on('data', onLine)
+    proc.stderr?.on('data', onLine)
+    proc.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`${cmd} exited with code ${code}`))))
+    proc.on('error', reject)
+  })
+}
+
+function runShell(cmd: string, log: (msg: string) => void, cwd?: string): Promise<void> {
+  return runWithLog('/bin/bash', ['-c', cmd], log, { cwd })
 }
 
 function which(bin: string): boolean {
-  try { exec(`which ${bin}`); return true } catch { return false }
+  try {
+    require('child_process').execSync(`which ${bin}`, { stdio: 'ignore' })
+    return true
+  } catch { return false }
 }
 
 export class SetupRunner {
@@ -45,28 +87,24 @@ export class SetupRunner {
     fs.writeFileSync(STATE_FILE, JSON.stringify(this.state, null, 2))
   }
 
-  private log(msg: string) {
-    this.emit('setup:log', msg)
-  }
+  private log(msg: string) { this.emit('setup:log', msg) }
 
   private progress(step: string, status: 'running' | 'done' | 'skipped' | 'error', detail?: string) {
     this.emit('setup:progress', { step, status, detail })
   }
 
-  getState(): State {
-    return this.state
-  }
+  getState(): State { return this.state }
 
   async runStep(stepId: string, payload?: Record<string, string>): Promise<{ ok: boolean; error?: string; data?: unknown }> {
     try {
       switch (stepId) {
-        case 'check-xcode': return this.checkXcode()
-        case 'install-prereqs': return this.installPrereqs()
-        case 'save-infura-key': return this.saveInfuraKey(payload?.key ?? '')
-        case 'clone-repo': return this.cloneOrPullRepo()
-        case 'install-deps': return this.installDeps()
-        case 'download-build': return this.downloadBuild()
-        case 'launch': return this.launch()
+        case 'check-xcode':      return await this.checkXcode()
+        case 'install-prereqs':  return await this.installPrereqs()
+        case 'save-infura-key':  return this.saveInfuraKey(payload?.key ?? '')
+        case 'clone-repo':       return await this.cloneOrPullRepo()
+        case 'install-deps':     return await this.installDeps()
+        case 'download-build':   return await this.downloadBuild()
+        case 'launch':           return await this.launch()
         default: return { ok: false, error: `Unknown step: ${stepId}` }
       }
     } catch (e: unknown) {
@@ -76,72 +114,76 @@ export class SetupRunner {
     }
   }
 
-  private checkXcode(): { ok: boolean; error?: string } {
-    this.progress('xcode', 'running')
+  private async checkXcode(): Promise<{ ok: boolean; error?: string }> {
+    this.progress('prereqs', 'running', 'Checking Xcode...')
     try {
-      exec('xcode-select -p')
-      const simPath = '/Applications/Xcode.app'
-      if (!fs.existsSync(simPath)) {
-        this.progress('xcode', 'error', 'Xcode not found')
-        return { ok: false, error: 'xcode-missing' }
-      }
-      this.progress('xcode', 'done')
+      require('child_process').execSync('xcode-select -p', { stdio: 'ignore' })
+      if (!fs.existsSync('/Applications/Xcode.app')) throw new Error()
+      this.progress('prereqs', 'running', 'Homebrew, Node 20, Yarn, Watchman')
       return { ok: true }
     } catch {
-      this.progress('xcode', 'error', 'Xcode not installed')
+      this.progress('prereqs', 'error', 'Xcode not found')
       return { ok: false, error: 'xcode-missing' }
     }
   }
 
   private async installPrereqs(): Promise<{ ok: boolean; error?: string }> {
     this.progress('prereqs', 'running')
+    const log = this.log.bind(this)
 
     // Homebrew
     if (!which('brew')) {
-      this.log('Installing Homebrew...')
-      exec('/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"')
+      log('Installing Homebrew...')
+      await runShell(
+        'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+        log
+      )
     } else {
-      this.log('Homebrew already installed')
+      log('Homebrew already installed ✓')
     }
+
+    // Ensure brew is on PATH (Apple Silicon path)
+    const brewPath = fs.existsSync('/opt/homebrew/bin/brew') ? '/opt/homebrew/bin' : '/usr/local/bin'
+    const env = { PATH: `${brewPath}:${process.env.PATH}` }
 
     // Node 20
-    try {
-      const nodeVer = exec('node --version')
-      if (!nodeVer.startsWith('v20')) {
-        this.log('Installing Node 20...')
-        exec('brew install node@20')
-        exec('brew link node@20 --force --overwrite')
-      } else {
-        this.log(`Node ${nodeVer} already installed`)
-      }
-    } catch {
-      this.log('Installing Node 20...')
-      exec('brew install node@20')
-      exec('brew link node@20 --force --overwrite')
+    const nodeOk = (() => {
+      try {
+        const v = require('child_process').execSync('node --version', { encoding: 'utf8' }).trim()
+        return v.startsWith('v20')
+      } catch { return false }
+    })()
+
+    if (!nodeOk) {
+      log('Installing Node 20...')
+      await runWithLog(`${brewPath}/brew`, ['install', 'node@20'], log)
+      await runWithLog(`${brewPath}/brew`, ['link', 'node@20', '--force', '--overwrite'], log)
+    } else {
+      log('Node 20 already installed ✓')
     }
 
-    // Yarn 4
+    // Yarn via corepack
     if (!which('yarn')) {
-      this.log('Installing Yarn...')
-      exec('corepack enable && corepack prepare yarn@4 --activate')
+      log('Enabling Yarn via corepack...')
+      await runShell('corepack enable && corepack prepare yarn@4 --activate', log, undefined)
     } else {
-      this.log('Yarn already installed')
+      log('Yarn already installed ✓')
     }
 
     // Watchman
     if (!which('watchman')) {
-      this.log('Installing Watchman...')
-      exec('brew install watchman')
+      log('Installing Watchman...')
+      await runWithLog(`${brewPath}/brew`, ['install', 'watchman'], log)
     } else {
-      this.log('Watchman already installed')
+      log('Watchman already installed ✓')
     }
 
     // Git
     if (!which('git')) {
-      this.log('Installing Git...')
-      exec('brew install git')
+      log('Installing Git...')
+      await runWithLog(`${brewPath}/brew`, ['install', 'git'], log)
     } else {
-      this.log('Git already installed')
+      log('Git already installed ✓')
     }
 
     this.progress('prereqs', 'done')
@@ -149,78 +191,99 @@ export class SetupRunner {
   }
 
   private saveInfuraKey(key: string): { ok: boolean; error?: string } {
-    if (!key || key.trim().length < 10) {
-      return { ok: false, error: 'Invalid API key' }
-    }
+    if (!key || key.trim().length < 10) return { ok: false, error: 'Invalid API key' }
     this.state.infuraKey = key.trim()
     this.saveState()
-    this.progress('infura', 'done')
     return { ok: true }
   }
 
-  private cloneOrPullRepo(): { ok: boolean; error?: string } {
+  private async cloneOrPullRepo(): Promise<{ ok: boolean; error?: string }> {
     this.progress('repo', 'running')
+    const log = this.log.bind(this)
 
-    if (fs.existsSync(REPO_DIR)) {
-      this.log('Pulling latest metamask-mobile...')
-      exec('git pull', { cwd: REPO_DIR })
+    if (fs.existsSync(path.join(REPO_DIR, '.git'))) {
+      log('Pulling latest metamask-mobile...')
+      await runWithLog('git', ['pull'], log, { cwd: REPO_DIR })
     } else {
-      this.log('Cloning metamask-mobile...')
-      exec(`git clone https://github.com/MetaMask/metamask-mobile.git "${REPO_DIR}"`)
+      log('Cloning MetaMask/metamask-mobile (this may take a minute)...')
+      await runWithLog('git', [
+        'clone', '--depth=1',
+        'https://github.com/MetaMask/metamask-mobile.git',
+        REPO_DIR,
+      ], log)
     }
 
-    // Write .js.env if missing or key changed
+    // Write .js.env only if missing
     const envPath = path.join(REPO_DIR, '.js.env')
-    const envContent = `MM_INFURA_PROJECT_ID=${this.state.infuraKey}\n`
     if (!fs.existsSync(envPath)) {
-      fs.writeFileSync(envPath, envContent)
-      this.log('Created .js.env')
+      fs.writeFileSync(envPath, `MM_INFURA_PROJECT_ID=${this.state.infuraKey}\n`)
+      log('Created .js.env with your Infura key ✓')
     } else {
-      this.log('.js.env already exists — leaving untouched')
+      log('.js.env already exists — leaving untouched ✓')
     }
 
     this.progress('repo', 'done')
     return { ok: true }
   }
 
-  private installDeps(): { ok: boolean; error?: string } {
+  private async installDeps(): Promise<{ ok: boolean; error?: string }> {
     this.progress('deps', 'running')
-    this.log('Running yarn setup:expo (this takes a few minutes)...')
-    exec('yarn setup:expo', { cwd: REPO_DIR })
+    const log = this.log.bind(this)
+
+    // Skip if node_modules exists and yarn.lock hasn't changed
+    const modulesExist = fs.existsSync(path.join(REPO_DIR, 'node_modules'))
+    if (modulesExist) {
+      log('Dependencies already installed — skipping ✓')
+      this.progress('deps', 'skipped')
+      return { ok: true }
+    }
+
+    log('Running yarn setup:expo — this takes 5-10 minutes...')
+    await runWithLog('yarn', ['setup:expo'], log, { cwd: REPO_DIR })
+
     this.progress('deps', 'done')
     return { ok: true }
   }
 
-  private async downloadBuild(): Promise<{ ok: boolean; error?: string; data?: unknown }> {
+  private async downloadBuild(): Promise<{ ok: boolean; error?: string }> {
     this.progress('build', 'running')
-    this.log('Checking latest Runway build...')
+    const log = this.log.bind(this)
 
-    const result = await getLatestRunwayBuildUrl(RUNWAY_BUCKET, this.log.bind(this))
+    log('Checking latest Runway build...')
+    const result = await getLatestRunwayBuildUrl(RUNWAY_BUCKET, log)
+
     if (!result.url || !result.filename) {
-      return { ok: false, error: 'Could not find build on Runway' }
+      return { ok: false, error: 'Could not find a build with an .app.zip on Runway' }
     }
 
     const buildId = result.filename.replace('.app.zip', '')
 
     if (this.state.installedBuild === buildId) {
-      this.log(`Build ${buildId} already installed — skipping download`)
+      log(`Build ${buildId} already installed ✓`)
       this.progress('build', 'skipped', buildId)
-      return { ok: true, data: { skipped: true } }
+      return { ok: true }
     }
 
     const zipPath = path.join(os.tmpdir(), result.filename)
-    this.log(`Downloading ${result.filename} (75 MB)...`)
-    exec(`curl -L -o "${zipPath}" "${result.url}"`)
+    log(`Downloading ${result.filename}...`)
+    await runWithLog('curl', ['-L', '--progress-bar', '-o', zipPath, result.url], log)
 
-    this.log('Unzipping...')
     const appDir = path.join(os.tmpdir(), 'metamask-sim-app')
+    fs.rmSync(appDir, { recursive: true, force: true })
     fs.mkdirSync(appDir, { recursive: true })
-    exec(`unzip -o "${zipPath}" -d "${appDir}"`)
 
-    this.log('Installing into Simulator...')
-    const appPath = exec(`find "${appDir}" -name "*.app" -maxdepth 2`).split('\n')[0]
-    exec('xcrun simctl boot "iPhone 16" 2>/dev/null || true')
-    exec(`xcrun simctl install booted "${appPath}"`)
+    log('Unzipping...')
+    await runWithLog('unzip', ['-o', zipPath, '-d', appDir], log)
+
+    log('Booting Simulator...')
+    await runShell('xcrun simctl boot "iPhone 16" 2>/dev/null || xcrun simctl boot "iPhone 15" 2>/dev/null || true', log)
+
+    const appPath = require('child_process')
+      .execSync(`find "${appDir}" -name "*.app" -maxdepth 2`, { encoding: 'utf8' })
+      .split('\n').filter(Boolean)[0]
+
+    log(`Installing ${path.basename(appPath)} into Simulator...`)
+    await runWithLog('xcrun', ['simctl', 'install', 'booted', appPath], log)
 
     this.state.installedBuild = buildId
     this.saveState()
@@ -229,31 +292,29 @@ export class SetupRunner {
     return { ok: true }
   }
 
-  private launch(): { ok: boolean; error?: string } {
+  private async launch(): Promise<{ ok: boolean; error?: string }> {
     this.progress('launch', 'running')
+    const log = this.log.bind(this)
 
-    // Open Simulator
-    exec('open -a Simulator')
+    log('Opening Simulator...')
+    await run('open', ['-a', 'Simulator'])
 
-    // Launch MetaMask bundle id
-    setTimeout(() => {
-      try {
-        exec('xcrun simctl launch booted io.metamask.MetaMask')
-      } catch {
-        // app may already be open
-      }
-    }, 2000)
+    // Wait for simulator to be ready
+    await new Promise(r => setTimeout(r, 3000))
 
-    // Start bundler in new Terminal tab
+    log('Launching MetaMask...')
+    await runShell('xcrun simctl launch booted io.metamask.MetaMask 2>/dev/null || true', log)
+
+    // Start bundler in a new Terminal tab
+    log('Starting bundler in Terminal...')
     const watchCmd = `cd "${REPO_DIR}" && yarn watch:clean`
-    spawn('osascript', [
-      '-e', `tell application "Terminal"`,
-      '-e', `do script "${watchCmd.replace(/"/g, '\\"')}"`,
-      '-e', `end tell`,
+    spawn('osascript', ['-e',
+      `tell application "Terminal" to do script "${watchCmd.replace(/"/g, '\\"')}"`
     ])
 
     this.state.setupComplete = true
     this.saveState()
+
     this.progress('launch', 'done')
     return { ok: true }
   }

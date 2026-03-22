@@ -4,6 +4,7 @@
   "description": "One-click MetaMask Mobile setup for designers",
   "main": "dist/main.js",
   "scripts": {
+    "postinstall": "npx playwright install chromium",
     "build": "tsc",
     "start": "npm run build && npx electron .",
     "dist": "npm run build && electron-builder --mac"
@@ -11,15 +12,37 @@
   "build": {
     "appId": "com.metamask.designer-setup",
     "productName": "MetaMask Designer Setup",
+    "copyright": "MetaMask",
     "mac": {
       "category": "public.app-category.developer-tools",
-      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }],
-      "icon": "assets/icon.icns"
+      "icon": "assets/icon.icns",
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] }
+      ],
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
     },
-    "files": ["dist/**/*", "assets/**/*"],
+    "dmg": {
+      "title": "MetaMask Designer Setup",
+      "contents": [
+        { "x": 130, "y": 220 },
+        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+      ],
+      "window": { "width": 540, "height": 400 }
+    },
+    "files": [
+      "dist/**/*",
+      "src/index.html",
+      "assets/icon.icns"
+    ],
     "extraResources": [
-      { "from": "node_modules/playwright", "to": "playwright" }
-    ]
+      {
+        "from": "node_modules/playwright-core/.local-chromium",
+        "to": "chromium",
+        "filter": ["**/*"]
+      }
+    ],
+    "asar": true
   },
   "dependencies": {
     "playwright": "^1.44.0"
