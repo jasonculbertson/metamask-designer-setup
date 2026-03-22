@@ -13,18 +13,17 @@ function createWindow() {
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#0f0f0f',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      // Use app.getAppPath() for both preload and HTML — works correctly in asar and dev
+      preload: path.join(app.getAppPath(), 'dist', 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
   })
 
-  // In production (asar), index.html is in src/ relative to app root
-  const htmlPath = app.isPackaged
-    ? path.join(process.resourcesPath, '..', 'src', 'index.html')
-    : path.join(__dirname, '..', 'src', 'index.html')
-
+  const htmlPath = path.join(app.getAppPath(), 'src', 'index.html')
   win.loadFile(htmlPath)
+
+  // win.webContents.openDevTools()
 }
 
 app.whenReady().then(() => {

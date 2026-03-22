@@ -445,6 +445,14 @@
         </div>
         <div class="step-status" id="step-repo-status"></div>
       </div>
+      <div class="step" id="step-refine-ai">
+        <div class="step-icon">🤖</div>
+        <div class="step-info">
+          <div class="step-name">Refine AI</div>
+          <div class="step-detail" id="step-refine-ai-detail">Checking for latest version</div>
+        </div>
+        <div class="step-status" id="step-refine-ai-status"></div>
+      </div>
       <div class="step" id="step-deps">
         <div class="step-icon">🧶</div>
         <div class="step-info">
@@ -479,18 +487,22 @@
     <div class="done-body">
       <div class="done-check">✓</div>
       <div class="welcome-title">You're all set!</div>
-      <div class="welcome-sub">MetaMask is running in the iOS Simulator. The bundler is running in a Terminal window in the background.</div>
+      <div class="welcome-sub">MetaMask is running in the iOS Simulator and connected to the bundler.</div>
       <div style="font-size:12px; color:#555; margin-top:4px;">Next time you open this app, it will launch MetaMask in seconds.</div>
-    </div>
-    <div class="footer-actions">
-      <button class="btn btn-primary" onclick="launchAgain()">Launch MetaMask Again</button>
     </div>
   </div>
 
 </div>
 
 <script>
+;(function () {
 const api = window.api
+
+// Safety check — if preload didn't inject api, show a visible error
+if (!api) {
+  document.body.innerHTML = '<div style="color:#ff6b6b;font-family:sans-serif;padding:40px;background:#0f0f0f;height:100vh;box-sizing:border-box"><h2>⚠️ Preload Error</h2><p>window.api is undefined — the preload script did not load correctly.</p><p style="opacity:0.5;font-size:12px">Check that preload.js exists in dist/ inside the asar.</p></div>'
+  throw new Error('window.api is undefined')
+}
 
 // ── State ──
 let state = {}
@@ -555,10 +567,15 @@ function showRunningError(msg) {
 async function startSetup() {
   state = await api.getState()
 
-  // Already set up — check for a newer build then launch
+  // Already set up — check Refine AI, check for a newer build, then launch
   if (state.setupComplete) {
     showScreen('running')
     resetStepUI()
+    const refineResult = await api.runStep('check-refine-ai')
+    if (!refineResult.ok) {
+      showRunningError('Refine AI check failed: ' + (refineResult.error || ''))
+      return
+    }
     const buildResult = await api.runStep('download-build')
     if (!buildResult.ok) {
       showRunningError('Build check failed: ' + (buildResult.error || ''))
@@ -630,7 +647,7 @@ async function continueWithInfura() {
 async function runFullSetup() {
   showScreen('running')
 
-  const steps = ['install-prereqs', 'clone-repo', 'install-deps', 'download-build', 'launch']
+  const steps = ['install-prereqs', 'clone-repo', 'check-refine-ai', 'install-deps', 'download-build', 'launch']
 
   for (const step of steps) {
     const result = await api.runStep(step)
@@ -671,6 +688,17 @@ async function launchAgain() {
   resetStepUI()
   runFullSetup()
 }
+
+// Expose onclick handlers to global scope (required for inline onclick= attributes)
+window.startSetup = startSetup
+window.openXcodeAppStore = openXcodeAppStore
+window.checkXcodeAgain = checkXcodeAgain
+window.openInfura = openInfura
+window.onInfuraInput = onInfuraInput
+window.continueWithInfura = continueWithInfura
+window.launchAgain = launchAgain
+
+})() // end IIFE
 </script>
 </body>
 </html>

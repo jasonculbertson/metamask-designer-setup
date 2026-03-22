@@ -4,8 +4,6 @@
   "description": "One-click MetaMask Mobile setup for designers",
   "main": "dist/main.js",
   "scripts": {
-    "postinstall": "npx playwright install chromium",
-    "prebuild": "node scripts/copy-chromium.js",
     "build": "tsc",
     "start": "npm run build && npx electron .",
     "dist": "npm run build && electron-builder --mac"
@@ -31,22 +29,15 @@
       ],
       "window": { "width": 540, "height": 400 }
     },
+    "directories": {
+      "output": "release"
+    },
     "files": [
-      "dist/**/*",
+      "dist/*.js",
       "src/index.html",
       "assets/icon.icns"
     ],
-    "extraResources": [
-      {
-        "from": "chromium-bundle",
-        "to": "chromium-bundle",
-        "filter": ["**/*"]
-      }
-    ],
     "asar": true
-  },
-  "dependencies": {
-    "playwright": "^1.44.0"
   },
   "devDependencies": {
     "electron": "^30.0.0",
