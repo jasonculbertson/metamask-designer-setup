@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MetaMask Designer Setup</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+      background: #0f0f0f;
+      color: #f0f0f0;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .titlebar {
+      height: 52px;
+      -webkit-app-region: drag;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      flex-shrink: 0;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 auto;
+    }
+
+    .logo-fox {
+      width: 28px;
+      height: 28px;
+    }
+
+    .logo-text {
+      font-size: 15px;
+      font-weight: 600;
+      color: #f0f0f0;
+      letter-spacing: -0.3px;
+    }
+
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 40px 32px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Screens ── */
+    .screen { display: none; flex-direction: column; flex: 1; }
+    .screen.active { display: flex; }
+
+    /* Welcome */
+    .welcome-body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      gap: 16px;
+      text-align: center;
+    }
+
+    .welcome-icon {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 8px;
+    }
+
+    .welcome-title {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      line-height: 1.2;
+    }
+
+    .welcome-sub {
+      font-size: 15px;
+      color: #888;
+      max-width: 360px;
+      line-height: 1.6;
+    }
+
+    /* Steps */
+    .steps-header {
+      margin-bottom: 24px;
+    }
+
+    .steps-title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.4px;
+    }
+
+    .steps-sub {
+      font-size: 13px;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    .step-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+    }
+
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 16px;
+      background: #1a1a1a;
+      border-radius: 12px;
+      border: 1px solid #2a2a2a;
+      transition: border-color 0.2s;
+    }
+
+    .step.active { border-color: #f6851b; }
+    .step.done { border-color: #2a2a2a; opacity: 0.7; }
+    .step.error { border-color: #ff4444; }
+
+    .step-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #2a2a2a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 16px;
+    }
+
+    .step.active .step-icon { background: #f6851b22; }
+    .step.done .step-icon { background: #22c55e22; }
+    .step.error .step-icon { background: #ff444422; }
+
+    .step-info { flex: 1; }
+
+    .step-name {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .step-detail {
+      font-size: 12px;
+      color: #666;
+      margin-top: 2px;
+    }
+
+    .step.active .step-detail { color: #f6851b; }
+    .step.error .step-detail { color: #ff4444; }
+
+    .step-status {
+      font-size: 12px;
+      color: #444;
+    }
+
+    .step.done .step-status { color: #22c55e; }
+
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid #333;
+      border-top-color: #f6851b;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    /* Infura step */
+    .infura-card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      flex: 1;
+    }
+
+    .infura-title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .infura-desc {
+      font-size: 14px;
+      color: #888;
+      line-height: 1.6;
+    }
+
+    .infura-desc strong { color: #f0f0f0; }
+
+    .infura-get-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      background: #1d3a5e;
+      border: 1px solid #2a5a9e;
+      border-radius: 10px;
+      color: #60a5fa;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      width: fit-content;
+      transition: background 0.15s;
+    }
+
+    .infura-get-btn:hover { background: #22457a; }
+
+    .key-input-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .key-label {
+      font-size: 12px;
+      color: #666;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .key-input {
+      background: #0f0f0f;
+      border: 1px solid #333;
+      border-radius: 10px;
+      color: #f0f0f0;
+      font-size: 14px;
+      font-family: 'SF Mono', monospace;
+      padding: 12px 16px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .key-input:focus { border-color: #f6851b; }
+    .key-input::placeholder { color: #444; }
+
+    .key-hint {
+      font-size: 12px;
+      color: #555;
+    }
+
+    /* Log view */
+    .log-view {
+      background: #0a0a0a;
+      border: 1px solid #222;
+      border-radius: 10px;
+      padding: 12px 16px;
+      height: 120px;
+      overflow-y: auto;
+      font-family: 'SF Mono', 'Menlo', monospace;
+      font-size: 11px;
+      color: #555;
+      margin-top: 12px;
+    }
+
+    .log-view .log-line { margin-bottom: 2px; }
+    .log-view .log-line.new { color: #888; }
+
+    /* Done screen */
+    .done-body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      gap: 16px;
+      text-align: center;
+    }
+
+    .done-check {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: #22c55e22;
+      border: 2px solid #22c55e44;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 14px 28px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s, transform 0.1s;
+      -webkit-app-region: no-drag;
+    }
+
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-primary {
+      background: #f6851b;
+      color: #000;
+      width: 100%;
+    }
+
+    .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+
+    .btn-secondary {
+      background: #1a1a1a;
+      color: #f0f0f0;
+      border: 1px solid #333;
+      width: 100%;
+    }
+
+    .error-banner {
+      background: #ff44441a;
+      border: 1px solid #ff444433;
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #ff7777;
+      display: none;
+      margin-top: 12px;
+    }
+
+    .error-banner.visible { display: block; }
+
+    .spacer { flex: 1; }
+
+    .footer-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-top: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="titlebar">
+  <div class="logo">
+    <svg class="logo-fox" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="40" height="40" rx="10" fill="#1a1a1a"/>
+      <text x="20" y="28" text-anchor="middle" font-size="22">🦊</text>
+    </svg>
+    <span class="logo-text">MetaMask Designer Setup</span>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- ── Screen: Welcome ── -->
+  <div class="screen active" id="screen-welcome">
+    <div class="welcome-body">
+      <div style="font-size:64px; line-height:1">🦊</div>
+      <div class="welcome-title">Set up MetaMask Mobile<br>for design review</div>
+      <div class="welcome-sub">This app will install everything you need to run MetaMask in the iOS Simulator — no Terminal required.</div>
+      <div style="font-size:12px; color:#555; margin-top:4px;">Takes about 20 minutes on first run.<br>After that, it launches in seconds.</div>
+    </div>
+    <div class="footer-actions">
+      <button class="btn btn-primary" onclick="startSetup()">Get Started</button>
+    </div>
+  </div>
+
+  <!-- ── Screen: Xcode Missing ── -->
+  <div class="screen" id="screen-xcode-missing">
+    <div class="welcome-body">
+      <div style="font-size:56px; line-height:1">🛠️</div>
+      <div class="welcome-title">Xcode Required</div>
+      <div class="welcome-sub">Xcode includes the iOS Simulator needed to run MetaMask. It's free and takes about 10 minutes to install.</div>
+    </div>
+    <div class="footer-actions">
+      <button class="btn btn-primary" onclick="openXcodeAppStore()">Open App Store → Xcode</button>
+      <button class="btn btn-secondary" onclick="checkXcodeAgain()">I've installed it — Continue</button>
+    </div>
+  </div>
+
+  <!-- ── Screen: Infura Key ── -->
+  <div class="screen" id="screen-infura">
+    <div class="infura-card">
+      <div>
+        <div class="infura-title">Your Infura API Key</div>
+        <div style="font-size:13px; color:#666; margin-top:4px;">Step 2 of 5</div>
+      </div>
+      <div class="infura-desc">
+        MetaMask needs an <strong>Infura API key</strong> to connect to the blockchain. It's free and takes 2 minutes to get.
+      </div>
+      <button class="infura-get-btn" onclick="openInfura()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        Get a free Infura key
+      </button>
+      <div class="key-input-wrap">
+        <div class="key-label">Paste your API Key here</div>
+        <input
+          class="key-input"
+          id="infura-key-input"
+          type="password"
+          placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          oninput="onInfuraInput()"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <div class="key-hint">From app.infura.io → your project → API Key</div>
+      </div>
+      <div id="infura-error" class="error-banner">Please enter a valid Infura API key.</div>
+    </div>
+    <div class="footer-actions" style="margin-top:16px;">
+      <button class="btn btn-primary" id="infura-continue-btn" disabled onclick="continueWithInfura()">Continue</button>
+    </div>
+  </div>
+
+  <!-- ── Screen: Running Setup ── -->
+  <div class="screen" id="screen-running">
+    <div class="steps-header">
+      <div class="steps-title">Setting up your environment</div>
+      <div class="steps-sub">Sit tight — everything is running in the background.</div>
+    </div>
+    <div class="step-list">
+      <div class="step" id="step-prereqs">
+        <div class="step-icon">📦</div>
+        <div class="step-info">
+          <div class="step-name">Install tools</div>
+          <div class="step-detail" id="step-prereqs-detail">Homebrew, Node 20, Yarn, Watchman</div>
+        </div>
+        <div class="step-status" id="step-prereqs-status"></div>
+      </div>
+      <div class="step" id="step-repo">
+        <div class="step-icon">📂</div>
+        <div class="step-info">
+          <div class="step-name">Clone repository</div>
+          <div class="step-detail" id="step-repo-detail">MetaMask/metamask-mobile</div>
+        </div>
+        <div class="step-status" id="step-repo-status"></div>
+      </div>
+      <div class="step" id="step-deps">
+        <div class="step-icon">🧶</div>
+        <div class="step-info">
+          <div class="step-name">Install dependencies</div>
+          <div class="step-detail" id="step-deps-detail">yarn setup:expo (~5 min)</div>
+        </div>
+        <div class="step-status" id="step-deps-status"></div>
+      </div>
+      <div class="step" id="step-build">
+        <div class="step-icon">📲</div>
+        <div class="step-info">
+          <div class="step-name">Download latest build</div>
+          <div class="step-detail" id="step-build-detail">Getting build from Runway</div>
+        </div>
+        <div class="step-status" id="step-build-status"></div>
+      </div>
+      <div class="step" id="step-launch">
+        <div class="step-icon">🚀</div>
+        <div class="step-info">
+          <div class="step-name">Launch MetaMask</div>
+          <div class="step-detail" id="step-launch-detail">iOS Simulator + bundler</div>
+        </div>
+        <div class="step-status" id="step-launch-status"></div>
+      </div>
+    </div>
+    <div class="log-view" id="log-view"></div>
+    <div id="running-error" class="error-banner"></div>
+  </div>
+
+  <!-- ── Screen: Done ── -->
+  <div class="screen" id="screen-done">
+    <div class="done-body">
+      <div class="done-check">✓</div>
+      <div class="welcome-title">You're all set!</div>
+      <div class="welcome-sub">MetaMask is running in the iOS Simulator. The bundler is running in a Terminal window in the background.</div>
+      <div style="font-size:12px; color:#555; margin-top:4px;">Next time you open this app, it will launch MetaMask in seconds.</div>
+    </div>
+    <div class="footer-actions">
+      <button class="btn btn-primary" onclick="launchAgain()">Launch MetaMask Again</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const api = window.api
+
+// ── State ──
+let state = {}
+let currentScreen = 'welcome'
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
+  document.getElementById('screen-' + id).classList.add('active')
+  currentScreen = id
+}
+
+// ── Progress listener ──
+api.onProgress((type, data) => {
+  if (type === 'log') {
+    appendLog(data)
+  } else if (type === 'progress') {
+    updateStep(data.step, data.status, data.detail)
+  } else if (type === 'error') {
+    showRunningError(data)
+  }
+})
+
+function appendLog(msg) {
+  const el = document.getElementById('log-view')
+  if (!el) return
+  const line = document.createElement('div')
+  line.className = 'log-line new'
+  line.textContent = '› ' + msg
+  el.appendChild(line)
+  el.scrollTop = el.scrollHeight
+}
+
+function updateStep(stepId, status, detail) {
+  const el = document.getElementById('step-' + stepId)
+  const detailEl = document.getElementById('step-' + stepId + '-detail')
+  const statusEl = document.getElementById('step-' + stepId + '-status')
+  if (!el) return
+
+  el.className = 'step ' + (status === 'running' ? 'active' : status === 'done' || status === 'skipped' ? 'done' : status === 'error' ? 'error' : '')
+
+  const icon = el.querySelector('.step-icon')
+  if (status === 'running') {
+    icon.innerHTML = '<div class="spinner"></div>'
+    if (statusEl) statusEl.textContent = ''
+  } else if (status === 'done' || status === 'skipped') {
+    icon.textContent = status === 'skipped' ? '⏭' : '✓'
+    if (statusEl) statusEl.textContent = status === 'skipped' ? 'skipped' : 'done'
+  } else if (status === 'error') {
+    icon.textContent = '✗'
+  }
+
+  if (detail && detailEl) detailEl.textContent = detail
+}
+
+function showRunningError(msg) {
+  const el = document.getElementById('running-error')
+  el.textContent = msg
+  el.classList.add('visible')
+}
+
+// ── Welcome → check xcode ──
+async function startSetup() {
+  state = await api.getState()
+
+  // If already fully set up, skip to launch
+  if (state.setupComplete) {
+    showScreen('running')
+    runStep('launch')
+    return
+  }
+
+  showScreen('running') // briefly show to check prereqs
+  const xcodeResult = await api.runStep('check-xcode')
+  if (!xcodeResult.ok && xcodeResult.error === 'xcode-missing') {
+    showScreen('xcode-missing')
+    return
+  }
+
+  // If infura key not yet saved, collect it
+  if (!state.infuraKey) {
+    showScreen('infura')
+    return
+  }
+
+  runFullSetup()
+}
+
+function openXcodeAppStore() {
+  api.openUrl('https://apps.apple.com/us/app/xcode/id497799835')
+}
+
+async function checkXcodeAgain() {
+  const result = await api.runStep('check-xcode')
+  if (result.ok) {
+    if (!state.infuraKey) {
+      showScreen('infura')
+    } else {
+      runFullSetup()
+    }
+  }
+}
+
+// ── Infura ──
+function openInfura() {
+  api.openUrl('https://app.infura.io/register')
+}
+
+function onInfuraInput() {
+  const val = document.getElementById('infura-key-input').value.trim()
+  document.getElementById('infura-continue-btn').disabled = val.length < 10
+  document.getElementById('infura-error').classList.remove('visible')
+}
+
+async function continueWithInfura() {
+  const key = document.getElementById('infura-key-input').value.trim()
+  const result = await api.runStep('save-infura-key', { key })
+  if (!result.ok) {
+    document.getElementById('infura-error').classList.add('visible')
+    return
+  }
+  state.infuraKey = key
+  runFullSetup()
+}
+
+// ── Main setup sequence ──
+async function runFullSetup() {
+  showScreen('running')
+
+  const steps = ['install-prereqs', 'clone-repo', 'install-deps', 'download-build', 'launch']
+
+  for (const step of steps) {
+    const result = await api.runStep(step)
+    if (!result.ok) {
+      showRunningError('Setup failed at step: ' + step + '. ' + (result.error || ''))
+      return
+    }
+  }
+
+  showScreen('done')
+}
+
+async function runStep(stepId) {
+  const result = await api.runStep(stepId)
+  if (!result.ok) {
+    showRunningError(result.error || 'Unknown error')
+    return
+  }
+  showScreen('done')
+}
+
+async function launchAgain() {
+  showScreen('running')
+  // Reset step UI
+  document.querySelectorAll('.step').forEach(s => {
+    s.className = 'step'
+    const icon = s.querySelector('.step-icon')
+    const emojis = { prereqs: '📦', repo: '📂', deps: '🧶', build: '📲', launch: '🚀' }
+    const id = s.id.replace('step-', '')
+    if (icon) icon.textContent = emojis[id] || '•'
+  })
+  document.getElementById('log-view').innerHTML = ''
+  document.getElementById('running-error').classList.remove('visible')
+  runFullSetup()
+}
+</script>
+</body>
+</html>
