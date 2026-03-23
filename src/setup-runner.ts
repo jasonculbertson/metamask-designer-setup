@@ -335,8 +335,30 @@ export class SetupRunner {
     }
 
     const zipPath = path.join(os.tmpdir(), result.filename)
-    log(`Downloading ${result.filename}...`)
-    await runWithLog('curl', ['-L', '--progress-bar', '-o', zipPath, result.url], log, { env: this.env })
+
+    // If the zip already exists from a previous run, ask the designer whether to reuse it
+    let skipDownload = false
+    if (fs.existsSync(zipPath)) {
+      const stat = fs.statSync(zipPath)
+      const ageMins = Math.round((Date.now() - stat.mtimeMs) / 60000)
+      const { dialog, BrowserWindow } = require('electron')
+      const win = BrowserWindow.getAllWindows()[0]
+      const { response } = await dialog.showMessageBox(win, {
+        type: 'question',
+        buttons: ['Use existing download', 'Download fresh'],
+        defaultId: 0,
+        title: 'Build already downloaded',
+        message: `A build was already downloaded ${ageMins < 60 ? `${ageMins} min` : `${Math.round(ageMins / 60)}h`} ago.`,
+        detail: `Use the existing file to save time, or download the latest from Runway.`,
+      })
+      skipDownload = response === 0
+      if (skipDownload) log(`Reusing existing download (${ageMins} min old) ✓`)
+    }
+
+    if (!skipDownload) {
+      log(`Downloading ${result.filename}...`)
+      await runWithLog('curl', ['-L', '--progress-bar', '-o', zipPath, result.url], log, { env: this.env })
+    }
 
     const appDir = path.join(os.tmpdir(), 'metamask-sim-app')
     fs.rmSync(appDir, { recursive: true, force: true })
