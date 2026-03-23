@@ -506,7 +506,7 @@ export class SetupRunner {
       return { ok: true }
     }
 
-    const latestVersion = latestRelease.tag_name.replace(/^v/, '') // e.g. "1.1.0"
+    const latestVersion = latestRelease.tag_name.replace(/^v/, '') // e.g. "1.1.1"
     const pkgAsset = latestRelease.assets.find((a: any) => a.name.endsWith('.pkg'))
 
     // Check currently installed version
