@@ -2,6 +2,13 @@
 
 Electron app that walks designers through a one-click setup for **MetaMask Mobile** on the **iOS Simulator**: tooling, repo clone, dependencies, Runway build install, Metro bundler, and Refine AI.
 
+## Download
+
+- **Latest release:** [GitHub Releases (latest)](https://github.com/jasonculbertson/metamask-designer-setup/releases/latest) — open the newest release and download the **Apple Silicon** `.dmg` (for example `MetaMask-Designer-Setup-1.0.0-arm64.dmg`).
+- **Direct link (v1.0.0):** [MetaMask-Designer-Setup-1.0.0-arm64.dmg](https://github.com/jasonculbertson/metamask-designer-setup/releases/download/v1.0.0/MetaMask-Designer-Setup-1.0.0-arm64.dmg)
+
+> Create a [GitHub Release](https://github.com/jasonculbertson/metamask-designer-setup/releases/new) and attach the `.dmg` from `npm run dist` if the link above returns “Not Found”.
+
 ## Requirements (before you run it)
 
 ### macOS
