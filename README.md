@@ -7,8 +7,6 @@ Electron app that walks designers through a one-click setup for **MetaMask Mobil
 - **Latest release:** [GitHub Releases (latest)](https://github.com/jasonculbertson/metamask-designer-setup/releases/latest) — open the newest release and download the **Apple Silicon** `.dmg` (for example `MetaMask-Designer-Setup-1.0.0-arm64.dmg`).
 - **Direct link (v1.0.0):** [MetaMask-Designer-Setup-1.0.0-arm64.dmg](https://github.com/jasonculbertson/metamask-designer-setup/releases/download/v1.0.0/MetaMask-Designer-Setup-1.0.0-arm64.dmg)
 
-**Private repository:** This repo is **private** on GitHub. Release downloads only work when you are **signed in** to a GitHub account that has access. If you open the links in a private window or you are not logged in, GitHub shows **404** (that is normal for private assets). Use the [Releases](https://github.com/jasonculbertson/metamask-designer-setup/releases) page while logged in, or add collaborators under **Settings → Collaborators**. To hand out a link that works **without** a GitHub account, either [make the repository public](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/setting-repository-visibility) or host the `.dmg` somewhere else (cloud storage, internal CDN, etc.).
-
 **Maintainers:** Publishing a new build — run `npm run dist`, then [create or edit a release](https://github.com/jasonculbertson/metamask-designer-setup/releases/new) and upload the generated `.dmg` from the `release/` folder.
 
 ## Requirements (before you run it)
