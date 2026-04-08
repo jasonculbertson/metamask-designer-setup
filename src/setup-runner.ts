@@ -222,13 +222,18 @@ export class SetupRunner {
     // ── Yarn via corepack ──
     if (!whichInEnv('yarn', env)) {
       log('Enabling Yarn via corepack...')
-      // Use full path to corepack in case it's not on the shell PATH yet
       const corepackBin = (() => {
         try {
           return require('child_process').execSync('which corepack', { encoding: 'utf8', env }).trim()
         } catch { return 'corepack' }
       })()
-      await runShell(`${corepackBin} enable && ${corepackBin} prepare yarn@4 --activate`, log, undefined, env)
+      // corepack enable may need sudo if the Node bin dir isn't user-writable
+      try {
+        await runShell(`${corepackBin} enable && ${corepackBin} prepare yarn@4 --activate`, log, undefined, env)
+      } catch {
+        log('corepack enable failed — retrying with sudo...')
+        await runShell(`sudo ${corepackBin} enable && ${corepackBin} prepare yarn@4 --activate`, log, undefined, env)
+      }
     } else {
       log('Yarn already installed ✓')
     }
