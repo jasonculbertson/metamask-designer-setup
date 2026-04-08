@@ -121,6 +121,7 @@ export class SetupRunner {
     try {
       switch (stepId) {
         case 'check-xcode':       return await this.checkXcode()
+        case 'check-homebrew':    return this.checkHomebrew()
         case 'install-prereqs':   return await this.installPrereqs()
         case 'save-infura-key':   return this.saveInfuraKey(payload?.key ?? '')
         case 'clone-repo':        return await this.cloneOrPullRepo()
@@ -148,6 +149,12 @@ export class SetupRunner {
       this.progress('prereqs', 'error', 'Xcode not found')
       return { ok: false, error: 'xcode-missing' }
     }
+  }
+
+  private checkHomebrew(): { ok: boolean; error?: string } {
+    const found = fs.existsSync('/opt/homebrew/bin/brew') || fs.existsSync('/usr/local/bin/brew')
+    if (!found) return { ok: false, error: 'homebrew-missing' }
+    return { ok: true }
   }
 
   private async installPrereqs(): Promise<{ ok: boolean; error?: string }> {
@@ -184,18 +191,8 @@ export class SetupRunner {
       : null
 
     if (!brewBin) {
-      log('Installing Homebrew — a password prompt will appear...')
-      // Prompt for password via native macOS dialog, then cache sudo credentials
-      // for the CURRENT user. Homebrew must not run as root — it handles sudo
-      // internally for the specific operations that need it.
-      await runShell(
-        `pwd=$(osascript -e 'tell app "System Events" to display dialog "MetaMask Designer Setup needs your password to install developer tools (Homebrew)." default answer "" with hidden answer buttons {"Cancel","OK"} default button "OK" with title "Administrator Password Required"' -e 'text returned of result') && echo "$pwd" | sudo -S -v 2>/dev/null && unset pwd`,
-        log, undefined, env
-      )
-      await runShell(
-        `NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`,
-        log, undefined, env
-      )
+      this.progress('prereqs', 'error', 'Homebrew not found')
+      return { ok: false, error: 'homebrew-missing' }
     } else {
       log(`Homebrew already installed ✓`)
     }

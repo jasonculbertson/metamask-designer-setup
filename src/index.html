@@ -388,6 +388,23 @@
     </div>
   </div>
 
+  <!-- ── Screen: Homebrew Missing ── -->
+  <div class="screen" id="screen-homebrew-missing">
+    <div class="welcome-body">
+      <div style="font-size:56px; line-height:1">🍺</div>
+      <div class="welcome-title">Homebrew Required</div>
+      <div class="welcome-sub">Homebrew is a free package manager that installs developer tools. Open <strong>Terminal</strong> and paste this command:</div>
+      <div style="background:#1a1a1a; border:1px solid #333; border-radius:10px; padding:14px 18px; margin-top:8px; width:100%; max-width:520px; position:relative; cursor:pointer;" onclick="copyBrewCommand()" id="brew-cmd-box">
+        <code style="font-size:12px; color:#f6851b; word-break:break-all; line-height:1.5;">/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code>
+        <div style="position:absolute; top:10px; right:12px; font-size:11px; color:#666;" id="brew-copy-label">click to copy</div>
+      </div>
+      <div style="font-size:12px; color:#555; margin-top:12px;">It will ask for your Mac password. When it finishes, come back here and click Continue.</div>
+    </div>
+    <div class="footer-actions">
+      <button class="btn btn-primary" onclick="checkHomebrewAgain()">I've installed it — Continue</button>
+    </div>
+  </div>
+
   <!-- ── Screen: Infura Key ── -->
   <div class="screen" id="screen-infura">
     <div class="infura-card">
@@ -597,6 +614,13 @@ async function startSetup() {
     return
   }
 
+  // Check Homebrew before moving on
+  const brewCheck = await api.runStep('check-homebrew')
+  if (!brewCheck.ok && brewCheck.error === 'homebrew-missing') {
+    showScreen('homebrew-missing')
+    return
+  }
+
   // If infura key not yet saved, collect it
   if (!state.infuraKey) {
     showScreen('infura')
@@ -608,6 +632,27 @@ async function startSetup() {
 
 function openXcodeAppStore() {
   api.openUrl('https://apps.apple.com/us/app/xcode/id497799835')
+}
+
+function copyBrewCommand() {
+  const cmd = '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+  navigator.clipboard.writeText(cmd).then(() => {
+    const label = document.getElementById('brew-copy-label')
+    label.textContent = 'copied!'
+    label.style.color = '#f6851b'
+    setTimeout(() => { label.textContent = 'click to copy'; label.style.color = '#666' }, 2000)
+  })
+}
+
+async function checkHomebrewAgain() {
+  const result = await api.runStep('check-homebrew')
+  if (result.ok) {
+    if (!state.infuraKey) {
+      showScreen('infura')
+    } else {
+      runFullSetup()
+    }
+  }
 }
 
 async function checkXcodeAgain() {
@@ -693,6 +738,8 @@ async function launchAgain() {
 window.startSetup = startSetup
 window.openXcodeAppStore = openXcodeAppStore
 window.checkXcodeAgain = checkXcodeAgain
+window.copyBrewCommand = copyBrewCommand
+window.checkHomebrewAgain = checkHomebrewAgain
 window.openInfura = openInfura
 window.onInfuraInput = onInfuraInput
 window.continueWithInfura = continueWithInfura
