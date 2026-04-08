@@ -156,6 +156,25 @@ export class SetupRunner {
 
     const env = this.env
 
+    // ── Check for admin rights (required by Homebrew) ──
+    const isAdmin = (() => {
+      try {
+        const groups = require('child_process').execSync('id', { encoding: 'utf8', env }).trim()
+        return groups.includes('staff') && (
+          groups.includes('admin') ||
+          require('child_process').execSync('dscl . -read /Groups/admin GroupMembership', { encoding: 'utf8', env })
+            .includes(os.userInfo().username)
+        )
+      } catch { return false }
+    })()
+
+    if (!isAdmin) {
+      const msg = `Your Mac account (${os.userInfo().username}) doesn't have Administrator privileges, which are required to install developer tools.\n\nTo fix this: go to System Settings → Users & Groups, select your account, and enable "Allow this user to administer this computer". You may need to ask IT for help.`
+      log(`⚠️ ${msg}`)
+      this.progress('prereqs', 'error', 'Admin privileges required')
+      return { ok: false, error: msg }
+    }
+
     // ── Homebrew ──
     // Detect by absolute path, NOT via which() — avoids PATH issues
     const brewBin = fs.existsSync('/opt/homebrew/bin/brew')
@@ -165,9 +184,16 @@ export class SetupRunner {
       : null
 
     if (!brewBin) {
-      log('Installing Homebrew (this takes a few minutes)...')
+      log('Installing Homebrew — a password prompt will appear...')
+      // Prompt for password via native macOS dialog, then cache sudo credentials
+      // for the CURRENT user. Homebrew must not run as root — it handles sudo
+      // internally for the specific operations that need it.
       await runShell(
-        'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+        `pwd=$(osascript -e 'tell app "System Events" to display dialog "MetaMask Designer Setup needs your password to install developer tools (Homebrew)." default answer "" with hidden answer buttons {"Cancel","OK"} default button "OK" with title "Administrator Password Required"' -e 'text returned of result') && echo "$pwd" | sudo -S -v 2>/dev/null && unset pwd`,
+        log, undefined, env
+      )
+      await runShell(
+        `NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`,
         log, undefined, env
       )
     } else {
@@ -457,12 +483,23 @@ export class SetupRunner {
       log('Bundler taking longer than expected — continuing anyway')
     }
 
-    // ── Step 4: Now launch MetaMask (bundler is ready) ──
-    log('Launching MetaMask in Simulator...')
-    // Use Expo dev client deep link — connects directly to bundler, no "Fetch development servers" needed
-    const bundlerUrl = encodeURIComponent('http://localhost:8081')
+    // ── Step 3b: Pre-compile the bundle so the app connects instantly ──
+    // Metro passes /status before the bundle is compiled — we hit the bundle
+    // endpoint directly so it's cached by the time the app opens.
+    log('Pre-compiling JS bundle (this takes 1-2 min the first time)...')
     await runShell(
-      `xcrun simctl openurl booted "metamask://expo-development-client/?url=${bundlerUrl}" 2>/dev/null || xcrun simctl launch booted io.metamask.MetaMask 2>/dev/null || true`,
+      'curl -sf --max-time 300 "http://localhost:8081/index.bundle?platform=ios&dev=true&minify=false" -o /dev/null 2>/dev/null || true',
+      log, undefined, this.env
+    )
+    log('Bundle ready ✓')
+
+    // ── Step 4: Launch MetaMask and auto-connect via deep link ──
+    log('Launching MetaMask in Simulator...')
+    const bundlerUrl = encodeURIComponent('http://localhost:8081')
+    await runShell(`xcrun simctl launch booted io.metamask.MetaMask 2>/dev/null || true`, log, undefined, this.env)
+    await new Promise(r => setTimeout(r, 3000))
+    await runShell(
+      `xcrun simctl openurl booted "expo-metamask://expo-development-client/?url=${bundlerUrl}" 2>/dev/null || true`,
       log, undefined, this.env
     )
 
@@ -470,10 +507,11 @@ export class SetupRunner {
     // Small delay so macOS finishes processing the MetaMask deep link first
     await new Promise(r => setTimeout(r, 2000))
     log('Launching Refine AI...')
-    await runShell(
-      'open -a "Refine AI" && sleep 1 && osascript -e \'tell application "Refine AI" to activate\' 2>/dev/null || true',
-      log, undefined, this.env
-    )
+    const refineUserApp = path.join(os.homedir(), 'Applications', 'Refine AI.app')
+    const refineCmd = require('fs').existsSync(refineUserApp)
+      ? `open "${refineUserApp}"`
+      : 'open -a "Refine AI"'
+    await runShell(`${refineCmd} 2>/dev/null || true`, log, undefined, this.env)
 
     this.state.setupComplete = true
     this.saveState()
@@ -486,8 +524,18 @@ export class SetupRunner {
     this.progress('refine-ai', 'running', 'Checking Refine AI...')
     const log = this.log.bind(this)
     const https = require('https')
-    const REFINE_AI_APP = '/Applications/Refine AI.app'
+    const REFINE_AI_PATHS = [
+      '/Applications/Refine AI.app',
+      path.join(os.homedir(), 'Applications', 'Refine AI.app'),
+    ]
+    const INSTALL_DIR = path.join(os.homedir(), 'Applications')
+    const REFINE_AI_DEST = path.join(INSTALL_DIR, 'Refine AI.app')
     const RELEASES_API = 'https://api.github.com/repos/jasonculbertson/refine-ai-releases/releases/latest'
+
+    // Hardcoded fallback in case GitHub API is rate-limited
+    const FALLBACK_VERSION = '1.1.2'
+    const FALLBACK_DMG_URL = 'https://github.com/jasonculbertson/refine-ai-releases/releases/download/v1.1.2/Refine.AI-1.1.2-arm64.dmg'
+    const FALLBACK_DMG_NAME = 'Refine.AI-1.1.2-arm64.dmg'
 
     // Fetch latest release info from GitHub
     const latestRelease = await new Promise<{ tag_name: string; assets: { name: string; browser_download_url: string }[] } | null>((resolve) => {
@@ -500,36 +548,31 @@ export class SetupRunner {
       }).on('error', () => resolve(null))
     })
 
-    if (!latestRelease || !latestRelease.tag_name) {
-      log('No Refine AI release found on GitHub yet — skipping')
-      this.progress('refine-ai', 'skipped')
-      return { ok: true }
+    const latestVersion = latestRelease?.tag_name?.replace(/^v/, '') ?? FALLBACK_VERSION
+    const dmgAsset = latestRelease?.assets?.find((a: any) => a.name.endsWith('.dmg'))
+      ?? { name: FALLBACK_DMG_NAME, browser_download_url: FALLBACK_DMG_URL }
+
+    if (!latestRelease) {
+      log(`GitHub API unavailable — using known version ${FALLBACK_VERSION}`)
     }
 
-    const latestVersion = latestRelease.tag_name.replace(/^v/, '') // e.g. "1.1.1"
-    const pkgAsset = latestRelease.assets.find((a: any) => a.name.endsWith('.pkg'))
-
-    // Check currently installed version
-    const installedPlistPath = `${REFINE_AI_APP}/Contents/Info.plist`
+    // Check currently installed version (both locations)
     const installedVersion = (() => {
-      try {
-        const out = require('child_process').execSync(
-          `defaults read "${installedPlistPath}" CFBundleShortVersionString`,
-          { encoding: 'utf8', env: this.env }
-        ).trim()
-        return out
-      } catch { return null }
+      for (const appPath of REFINE_AI_PATHS) {
+        try {
+          const out = require('child_process').execSync(
+            `defaults read "${appPath}/Contents/Info.plist" CFBundleShortVersionString`,
+            { encoding: 'utf8', env: this.env }
+          ).trim()
+          if (out) return out
+        } catch { /* try next */ }
+      }
+      return null
     })()
 
     if (installedVersion === latestVersion) {
-      log(`Refine AI ${latestVersion} already up to date ✓`)
+      log(`Refine AI ${latestVersion} already installed ✓`)
       this.progress('refine-ai', 'done', `v${latestVersion} ✓`)
-      return { ok: true }
-    }
-
-    if (!pkgAsset) {
-      log('No .pkg found in latest Refine AI release — skipping')
-      this.progress('refine-ai', 'skipped')
       return { ok: true }
     }
 
@@ -539,14 +582,24 @@ export class SetupRunner {
       log(`Installing Refine AI ${latestVersion}...`)
     }
 
-    const pkgPath = path.join(os.tmpdir(), pkgAsset.name)
-    await runWithLog('curl', ['-L', '--progress-bar', '-o', pkgPath, pkgAsset.browser_download_url], log, { env: this.env })
+    const dmgPath = path.join(os.tmpdir(), dmgAsset.name)
+    await runWithLog('curl', ['-L', '--progress-bar', '-o', dmgPath, dmgAsset.browser_download_url], log, { env: this.env })
 
-    log('Installing .pkg — a macOS password prompt will appear...')
-    await runShell(
-      `osascript -e 'do shell script "installer -pkg \\"${pkgPath}\\" -target /" with administrator privileges'`,
-      log, undefined, this.env
+    log('Mounting disk image...')
+    const attachOut = require('child_process').execSync(
+      `hdiutil attach "${dmgPath}" -nobrowse -noverify`,
+      { encoding: 'utf8', env: this.env }
     )
+    const volMatch = attachOut.match(/\/Volumes\/[^\n\t]+/)
+    if (!volMatch) throw new Error('Could not find mount point for Refine AI disk image')
+    const vol = volMatch[0].trim()
+
+    require('fs').mkdirSync(INSTALL_DIR, { recursive: true })
+    await runShell(`rm -rf "${REFINE_AI_DEST}"`, log, undefined, this.env)
+    log('Copying Refine AI to ~/Applications...')
+    await runShell(`cp -R "${vol}/Refine AI.app" "${REFINE_AI_DEST}"`, log, undefined, this.env)
+    await runShell(`hdiutil detach "${vol}" -quiet || true`, log, undefined, this.env)
+    try { require('fs').unlinkSync(dmgPath) } catch { /* ignore */ }
 
     log(`Refine AI ${latestVersion} installed ✓`)
     this.progress('refine-ai', 'done', `v${latestVersion}`)
