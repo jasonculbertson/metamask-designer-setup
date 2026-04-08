@@ -89,8 +89,13 @@ function buildFullPath(): string {
 export class SetupRunner {
   private emit: Emit
   private state: State = {}
-  // Full PATH built once at construction — all steps use this so tools are always findable
-  private env: NodeJS.ProcessEnv = { ...process.env, PATH: buildFullPath() }
+  // Full PATH built once at construction — all steps use this so tools are always findable.
+  // DEVELOPER_DIR ensures xcrun/simctl resolve to the full Xcode, not just Command Line Tools.
+  private env: NodeJS.ProcessEnv = {
+    ...process.env,
+    PATH: buildFullPath(),
+    DEVELOPER_DIR: '/Applications/Xcode.app/Contents/Developer',
+  }
 
   constructor(emit: Emit) {
     this.emit = emit
