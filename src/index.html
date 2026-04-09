@@ -499,6 +499,19 @@
     <div id="running-error" class="error-banner"></div>
   </div>
 
+  <!-- ── Screen: Returning User ── -->
+  <div class="screen" id="screen-returning">
+    <div class="welcome-body">
+      <div style="font-size:56px; line-height:1">🦊</div>
+      <div class="welcome-title">Welcome back</div>
+      <div class="welcome-sub">Your environment is already set up. What would you like to do?</div>
+    </div>
+    <div class="footer-actions">
+      <button class="btn btn-primary" onclick="launchOnly()">Launch MetaMask</button>
+      <button class="btn btn-secondary" onclick="launchWithNewBuild()">Download new build from Runway</button>
+    </div>
+  </div>
+
   <!-- ── Screen: Done ── -->
   <div class="screen" id="screen-done">
     <div class="done-body">
@@ -584,21 +597,9 @@ function showRunningError(msg) {
 async function startSetup() {
   state = await api.getState()
 
-  // Already set up — skip Runway, just check Refine AI and launch
+  // Already set up — let the user choose
   if (state.setupComplete) {
-    showScreen('running')
-    resetStepUI()
-    const refineResult = await api.runStep('check-refine-ai')
-    if (!refineResult.ok) {
-      showRunningError('Refine AI check failed: ' + (refineResult.error || ''))
-      return
-    }
-    const launchResult = await api.runStep('launch')
-    if (!launchResult.ok) {
-      showRunningError(launchResult.error || 'Launch failed')
-      return
-    }
-    showScreen('done')
+    showScreen('returning')
     return
   }
 
@@ -683,6 +684,44 @@ async function continueWithInfura() {
   runFullSetup()
 }
 
+// ── Returning user actions ──
+async function launchOnly() {
+  showScreen('running')
+  resetStepUI()
+  const refineResult = await api.runStep('check-refine-ai')
+  if (!refineResult.ok) {
+    showRunningError('Refine AI check failed: ' + (refineResult.error || ''))
+    return
+  }
+  const launchResult = await api.runStep('launch')
+  if (!launchResult.ok) {
+    showRunningError(launchResult.error || 'Launch failed')
+    return
+  }
+  showScreen('done')
+}
+
+async function launchWithNewBuild() {
+  showScreen('running')
+  resetStepUI()
+  const refineResult = await api.runStep('check-refine-ai')
+  if (!refineResult.ok) {
+    showRunningError('Refine AI check failed: ' + (refineResult.error || ''))
+    return
+  }
+  const buildResult = await api.runStep('download-build')
+  if (!buildResult.ok) {
+    showRunningError('Build download failed: ' + (buildResult.error || ''))
+    return
+  }
+  const launchResult = await api.runStep('launch')
+  if (!launchResult.ok) {
+    showRunningError(launchResult.error || 'Launch failed')
+    return
+  }
+  showScreen('done')
+}
+
 // ── Main setup sequence ──
 async function runFullSetup() {
   showScreen('running')
@@ -739,6 +778,8 @@ window.openInfura = openInfura
 window.onInfuraInput = onInfuraInput
 window.continueWithInfura = continueWithInfura
 window.launchAgain = launchAgain
+window.launchOnly = launchOnly
+window.launchWithNewBuild = launchWithNewBuild
 
 })() // end IIFE
 </script>
