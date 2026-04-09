@@ -348,6 +348,30 @@ export class SetupRunner {
     return { ok: true }
   }
 
+  private bootSimulator(log: (msg: string) => void): { ok: boolean; error?: string } {
+    require('child_process').spawnSync('/bin/bash', ['-c', [
+      'xcrun simctl boot "iPhone 16" 2>/dev/null',
+      'xcrun simctl boot "iPhone 16 Pro" 2>/dev/null',
+      'xcrun simctl boot "iPhone 15" 2>/dev/null',
+      'xcrun simctl boot "iPhone 15 Pro" 2>/dev/null',
+      'DEVICE=$(xcrun simctl list devices available -j 2>/dev/null | python3 -c "import sys,json; devs=json.load(sys.stdin)[\'devices\']; phones=[d[\'udid\'] for r in devs for d in devs[r] if \'iPhone\' in d.get(\'name\',\'\') and d.get(\'state\')==\'Shutdown\']; print(phones[0] if phones else \'\')" 2>/dev/null) && [ -n "$DEVICE" ] && xcrun simctl boot "$DEVICE" 2>/dev/null',
+    ].join(' || ')], { env: this.env, stdio: 'pipe' })
+
+    const bootedCheck = require('child_process').execSync(
+      'xcrun simctl list devices booted -j', { encoding: 'utf8', env: this.env }
+    )
+    const bootedDevices = JSON.parse(bootedCheck)
+    const anyBooted = Object.values(bootedDevices.devices as Record<string, any[]>)
+      .flat().some((d: any) => d.state === 'Booted')
+
+    if (!anyBooted) {
+      log('No simulator could be booted. Open Xcode → Settings → Platforms and install an iOS Simulator runtime.')
+      return { ok: false, error: 'No iOS Simulator available. Open Xcode → Settings → Platforms and download an iOS Simulator runtime, then try again.' }
+    }
+    log('Simulator booted ✓')
+    return { ok: true }
+  }
+
   private async downloadBuild(): Promise<{ ok: boolean; error?: string }> {
     this.progress('build', 'running')
     const log = this.log.bind(this)
@@ -401,29 +425,8 @@ export class SetupRunner {
     await runWithLog('unzip', ['-o', zipPath, '-d', appDir], log, { env: this.env })
 
     log('Booting Simulator...')
-    // Try preferred devices first, then fall back to any available iPhone simulator
-    const bootResult = require('child_process').spawnSync('/bin/bash', ['-c', [
-      'xcrun simctl boot "iPhone 16" 2>/dev/null',
-      'xcrun simctl boot "iPhone 16 Pro" 2>/dev/null',
-      'xcrun simctl boot "iPhone 15" 2>/dev/null',
-      'xcrun simctl boot "iPhone 15 Pro" 2>/dev/null',
-      // Fall back: find any shutdown iPhone and boot it
-      'DEVICE=$(xcrun simctl list devices available -j 2>/dev/null | python3 -c "import sys,json; devs=json.load(sys.stdin)[\'devices\']; phones=[d[\'udid\'] for r in devs for d in devs[r] if \'iPhone\' in d.get(\'name\',\'\') and d.get(\'state\')==\'Shutdown\']; print(phones[0] if phones else \'\')" 2>/dev/null) && [ -n "$DEVICE" ] && xcrun simctl boot "$DEVICE" 2>/dev/null',
-    ].join(' || ')], { env: this.env, stdio: 'pipe' })
-
-    // Verify something is actually booted
-    const bootedCheck = require('child_process').execSync(
-      'xcrun simctl list devices booted -j', { encoding: 'utf8', env: this.env }
-    )
-    const bootedDevices = JSON.parse(bootedCheck)
-    const anyBooted = Object.values(bootedDevices.devices as Record<string, any[]>)
-      .flat().some((d: any) => d.state === 'Booted')
-
-    if (!anyBooted) {
-      log('No simulator could be booted. Please open Xcode → Settings → Platforms and install an iOS Simulator runtime.')
-      return { ok: false, error: 'No iOS Simulator available. Open Xcode → Settings → Platforms and download an iOS Simulator runtime, then try again.' }
-    }
-    log('Simulator booted ✓')
+    const bootStatus = this.bootSimulator(log)
+    if (!bootStatus.ok) return bootStatus
 
     // Find the .app bundle — handle both nested (.app folder inside zip) and
     // flat (zip extracted .app contents directly into appDir) zip structures
@@ -457,9 +460,18 @@ export class SetupRunner {
     const log = this.log.bind(this)
 
     // ── Step 1: Boot simulator ──
-    log('Opening Simulator...')
+    log('Booting Simulator...')
+    const bootStatus = this.bootSimulator(log)
+    if (!bootStatus.ok) return bootStatus
     await run('open', ['-a', 'Simulator'])
-    await new Promise(r => setTimeout(r, 3000))
+    await new Promise(r => setTimeout(r, 2000))
+
+    // ── Step 1b: Ensure corepack/yarn shims exist for Homebrew Node ──
+    try {
+      require('child_process').execSync('corepack enable 2>/dev/null || sudo corepack enable 2>/dev/null || true', {
+        env: this.env, stdio: 'ignore',
+      })
+    } catch { /* best-effort */ }
 
     // ── Step 2: Start bundler FIRST, logging to a file so we can debug ──
     const bundlerLog = path.join(os.tmpdir(), 'metamask-bundler.log')
