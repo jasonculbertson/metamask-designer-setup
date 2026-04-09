@@ -37,6 +37,10 @@ app.on('window-all-closed', () => {
   app.quit()
 })
 
+app.on('will-quit', () => {
+  runner?.cleanup()
+})
+
 ipcMain.on('open-url', (_e, url: string) => {
   shell.openExternal(url)
 })

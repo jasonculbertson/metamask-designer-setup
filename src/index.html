@@ -584,18 +584,13 @@ function showRunningError(msg) {
 async function startSetup() {
   state = await api.getState()
 
-  // Already set up — check Refine AI, check for a newer build, then launch
+  // Already set up — skip Runway, just check Refine AI and launch
   if (state.setupComplete) {
     showScreen('running')
     resetStepUI()
     const refineResult = await api.runStep('check-refine-ai')
     if (!refineResult.ok) {
       showRunningError('Refine AI check failed: ' + (refineResult.error || ''))
-      return
-    }
-    const buildResult = await api.runStep('download-build')
-    if (!buildResult.ok) {
-      showRunningError('Build check failed: ' + (buildResult.error || ''))
       return
     }
     const launchResult = await api.runStep('launch')

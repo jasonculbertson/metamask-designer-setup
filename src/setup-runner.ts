@@ -89,6 +89,7 @@ function buildFullPath(): string {
 export class SetupRunner {
   private emit: Emit
   private state: State = {}
+  private bundlerPid: number | null = null
   // Full PATH built once at construction — all steps use this so tools are always findable.
   // DEVELOPER_DIR ensures xcrun/simctl resolve to the full Xcode, not just Command Line Tools.
   private env: NodeJS.ProcessEnv = {
@@ -121,6 +122,14 @@ export class SetupRunner {
   }
 
   getState(): State { return this.state }
+
+  cleanup() {
+    if (this.bundlerPid) {
+      try { process.kill(-this.bundlerPid) } catch { /* already gone */ }
+      try { process.kill(this.bundlerPid) } catch { /* already gone */ }
+      this.bundlerPid = null
+    }
+  }
 
   async runStep(stepId: string, payload?: Record<string, string>): Promise<{ ok: boolean; error?: string; data?: unknown }> {
     try {
@@ -483,6 +492,7 @@ export class SetupRunner {
       detached: true,
       stdio: ['ignore', logFd, logFd],
     })
+    this.bundlerPid = bundler.pid ?? null
     bundler.unref()
 
     // ── Step 3: Wait for Metro to be ready on port 8081 (max 3 min) ──
