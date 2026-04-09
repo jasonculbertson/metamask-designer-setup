@@ -1,6 +1,6 @@
 {
   "name": "metamask-designer-setup",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "One-click MetaMask Mobile setup for designers",
   "main": "dist/main.js",
   "scripts": {
@@ -18,8 +18,11 @@
       "target": [
         { "target": "dmg", "arch": ["arm64"] }
       ],
-      "hardenedRuntime": false,
-      "gatekeeperAssess": false
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "entitlements.plist",
+      "entitlementsInherit": "entitlements.plist",
+      "notarize": { "teamId": "2WRVG46HV2" }
     },
     "dmg": {
       "title": "MetaMask Designer Setup",
