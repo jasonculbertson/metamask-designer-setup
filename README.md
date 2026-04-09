@@ -5,7 +5,7 @@ Electron app that walks designers through a one-click setup for **MetaMask Mobil
 ## Download
 
 - **Latest release:** [GitHub Releases (latest)](https://github.com/jasonculbertson/metamask-designer-setup/releases/latest) — open the newest release and download the **Apple Silicon** `.dmg`.
-- **Direct link (v1.0.1):** [MetaMask-Designer-Setup-1.0.1-arm64.dmg](https://github.com/jasonculbertson/metamask-designer-setup/releases/download/v1.0.1/MetaMask-Designer-Setup-1.0.1-arm64.dmg)
+- **Direct link (v1.0.2):** [MetaMask-Designer-Setup-1.0.2-arm64.dmg](https://github.com/jasonculbertson/metamask-designer-setup/releases/download/v1.0.2/MetaMask-Designer-Setup-1.0.2-arm64.dmg)
 
 **Maintainers:** Publishing a new build — run `npm run dist`, then [create or edit a release](https://github.com/jasonculbertson/metamask-designer-setup/releases/new) and upload the generated `.dmg` from the `release/` folder.
 
