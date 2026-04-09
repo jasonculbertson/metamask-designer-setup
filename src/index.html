@@ -520,6 +520,9 @@
       <div class="welcome-sub">MetaMask is running in the iOS Simulator and connected to the bundler.</div>
       <div style="font-size:12px; color:#555; margin-top:4px;">Next time you open this app, it will launch MetaMask in seconds.</div>
     </div>
+    <div class="footer-actions" style="margin-top:16px;">
+      <button class="btn btn-secondary" onclick="switchBuild()">Download a different build from Runway</button>
+    </div>
   </div>
 
 </div>
@@ -722,6 +725,22 @@ async function launchWithNewBuild() {
   showScreen('done')
 }
 
+async function switchBuild() {
+  showScreen('running')
+  resetStepUI()
+  const buildResult = await api.runStep('download-build')
+  if (!buildResult.ok) {
+    showRunningError('Build download failed: ' + (buildResult.error || ''))
+    return
+  }
+  const launchResult = await api.runStep('launch')
+  if (!launchResult.ok) {
+    showRunningError(launchResult.error || 'Launch failed')
+    return
+  }
+  showScreen('done')
+}
+
 // ── Main setup sequence ──
 async function runFullSetup() {
   showScreen('running')
@@ -778,6 +797,7 @@ window.openInfura = openInfura
 window.onInfuraInput = onInfuraInput
 window.continueWithInfura = continueWithInfura
 window.launchAgain = launchAgain
+window.switchBuild = switchBuild
 window.launchOnly = launchOnly
 window.launchWithNewBuild = launchWithNewBuild
 
