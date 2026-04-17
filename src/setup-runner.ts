@@ -947,8 +947,10 @@ export class SetupRunner {
         await runWithLog('xcrun', ['simctl', 'install', 'booted', appPath], log, { env: this.env })
         log('MetaMask reinstalled ✓')
       } else {
-        log('⚠️ No valid cached build found — tap "New Runway Build" to download and install MetaMask')
-        return { ok: false, error: 'MetaMask is not installed in the Simulator. Tap "New Runway Build" to download and install it.' }
+        // No cache — download fresh from Runway automatically, same as launch()
+        log('No cached build found — downloading from Runway...')
+        const buildResult = await this.downloadBuild()
+        if (!buildResult.ok) return buildResult
       }
     }
 
