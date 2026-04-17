@@ -9,13 +9,19 @@ contextBridge.exposeInMainWorld('api', {
     const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb('progress', data)
     const logHandler = (_: Electron.IpcRendererEvent, data: unknown) => cb('log', data)
     const errorHandler = (_: Electron.IpcRendererEvent, data: unknown) => cb('error', data)
+    const crashHandler = (_: Electron.IpcRendererEvent, data: unknown) => cb('bundler-crashed', data)
+    const updateHandler = (_: Electron.IpcRendererEvent, data: unknown) => cb('update-available', data)
     ipcRenderer.on('setup:progress', handler)
     ipcRenderer.on('setup:log', logHandler)
     ipcRenderer.on('setup:error', errorHandler)
+    ipcRenderer.on('setup:bundler-crashed', crashHandler)
+    ipcRenderer.on('app:update-available', updateHandler)
     return () => {
       ipcRenderer.removeListener('setup:progress', handler)
       ipcRenderer.removeListener('setup:log', logHandler)
       ipcRenderer.removeListener('setup:error', errorHandler)
+      ipcRenderer.removeListener('setup:bundler-crashed', crashHandler)
+      ipcRenderer.removeListener('app:update-available', updateHandler)
     }
   },
 })

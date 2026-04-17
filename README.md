@@ -4,7 +4,7 @@ One-click app for designers to run **MetaMask Mobile** in the iOS Simulator — 
 
 ## Download
 
-**[Download v1.0.2 (Apple Silicon)](https://github.com/jasonculbertson/metamask-designer-setup/releases/download/v1.0.2/MetaMask.Designer.Setup-1.0.2-arm64.dmg)**
+**[Download v1.0.3 (Apple Silicon)](https://github.com/jasonculbertson/metamask-designer-setup/releases/download/v1.0.3/MetaMask%20Designer%20Setup-1.0.3-arm64.dmg)**
 
 Requires an Apple Silicon Mac (M1/M2/M3 or later) running macOS.
 

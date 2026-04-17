@@ -1,6 +1,6 @@
 {
   "name": "metamask-designer-setup",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "One-click MetaMask Mobile setup for designers",
   "main": "dist/main.js",
   "scripts": {
@@ -16,21 +16,37 @@
       "category": "public.app-category.developer-tools",
       "icon": "assets/icon.icns",
       "target": [
-        { "target": "dmg", "arch": ["arm64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
       ],
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "entitlements.plist",
       "entitlementsInherit": "entitlements.plist",
-      "notarize": { "teamId": "2WRVG46HV2" }
+      "notarize": false
     },
     "dmg": {
       "title": "MetaMask Designer Setup",
       "contents": [
-        { "x": 130, "y": 220 },
-        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
       ],
-      "window": { "width": 540, "height": 400 }
+      "window": {
+        "width": 540,
+        "height": 400
+      }
     },
     "directories": {
       "output": "release"
@@ -40,12 +56,23 @@
       "src/index.html",
       "assets/icon.icns"
     ],
-    "asar": true
+    "asar": true,
+    "publish": {
+      "provider": "github",
+      "owner": "jasonculbertson",
+      "repo": "metamask-designer-setup"
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.0.0"
   },
   "devDependencies": {
+    "@types/node": "^20.0.0",
     "electron": "^30.0.0",
     "electron-builder": "^24.0.0",
-    "typescript": "^5.4.0",
-    "@types/node": "^20.0.0"
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.3"
   }
 }

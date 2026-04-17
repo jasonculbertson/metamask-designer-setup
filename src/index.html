@@ -346,6 +346,290 @@
       gap: 8px;
       padding-top: 16px;
     }
+
+    /* PR picker */
+    .pr-section {
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+      text-align: left;
+    }
+
+    .pr-current {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .pr-current strong {
+      color: #f6851b;
+      font-weight: 600;
+    }
+
+    .pr-input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .pr-input {
+      flex: 1;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 10px;
+      color: #f0f0f0;
+      font-size: 14px;
+      padding: 12px 16px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .pr-input:focus { border-color: #f6851b; }
+    .pr-input::placeholder { color: #555; }
+
+    .pr-go-btn {
+      padding: 12px 20px;
+      background: #f6851b;
+      color: #000;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.15s;
+    }
+    .pr-go-btn:hover:not(:disabled) { opacity: 0.9; }
+    .pr-go-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .pr-status-msg {
+      font-size: 12px;
+      color: #22c55e;
+      margin-top: 8px;
+      min-height: 18px;
+      text-align: center;
+    }
+    .pr-status-msg.error { color: #ff7777; }
+
+    .pr-preview {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-top: 10px;
+      display: none;
+    }
+
+    .pr-preview.visible { display: block; }
+
+    .pr-preview-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #f0f0f0;
+      margin-bottom: 4px;
+    }
+
+    .pr-preview-meta {
+      font-size: 12px;
+      color: #888;
+    }
+
+    .pr-preview-desc {
+      font-size: 12px;
+      color: #666;
+      margin-top: 8px;
+      line-height: 1.5;
+      max-height: 60px;
+      overflow: hidden;
+    }
+
+    .pr-list-label {
+      font-size: 11px;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 16px;
+      margin-bottom: 8px;
+    }
+
+    .pr-list {
+      max-height: 200px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .pr-item {
+      padding: 10px 14px;
+      background: #151515;
+      border: 1px solid #222;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .pr-item:hover {
+      border-color: #444;
+      background: #1a1a1a;
+    }
+
+    .pr-item-header {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .pr-item-number {
+      font-size: 12px;
+      color: #f6851b;
+      font-weight: 600;
+      font-family: 'SF Mono', 'Menlo', monospace;
+      flex-shrink: 0;
+    }
+
+    .pr-item-title {
+      font-size: 13px;
+      color: #ccc;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .pr-item-meta {
+      font-size: 11px;
+      color: #555;
+      margin-top: 2px;
+    }
+
+    .pr-item-draft {
+      font-size: 10px;
+      color: #666;
+      background: #222;
+      padding: 1px 6px;
+      border-radius: 4px;
+      margin-left: 6px;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .action-row .btn { flex: 1; }
+
+    .btn-sm {
+      padding: 10px 16px;
+      font-size: 13px;
+      border-radius: 10px;
+    }
+
+    /* Team filter chips */
+    .pr-filters {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .pr-filter-chip {
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #1a1a1a;
+      color: #888;
+      border: 1px solid #2a2a2a;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .pr-filter-chip:hover { border-color: #444; color: #ccc; }
+    .pr-filter-chip.active { background: #f6851b22; border-color: #f6851b; color: #f6851b; }
+
+    /* Open in GitHub link */
+    .pr-preview-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      color: #60a5fa;
+      text-decoration: none;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: color 0.15s;
+    }
+    .pr-preview-link:hover { color: #93bbfc; }
+
+    /* Appearance toggle */
+    .appearance-toggle {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .appearance-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      border: 1px solid #333;
+      background: #1a1a1a;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .appearance-btn:hover { border-color: #555; }
+    .appearance-btn.active { border-color: #f6851b; background: #f6851b22; }
+
+    /* Crash banner */
+    .crash-banner {
+      background: #ff44441a;
+      border: 1px solid #ff444433;
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #ff7777;
+      display: none;
+      margin-top: 8px;
+      text-align: center;
+    }
+
+    .crash-banner.visible { display: flex; align-items: center; justify-content: center; gap: 12px; }
+
+    .crash-banner button {
+      background: #ff444422;
+      border: 1px solid #ff444444;
+      border-radius: 8px;
+      color: #ff7777;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+
+    .crash-banner button:hover { background: #ff444433; }
+
+    /* Update banner */
+    .update-banner {
+      background: #60a5fa1a;
+      border: 1px solid #60a5fa33;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 12px;
+      color: #60a5fa;
+      display: none;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .update-banner.visible { display: block; }
   </style>
 </head>
 <body>
@@ -501,10 +785,22 @@
 
   <!-- ── Screen: Returning User ── -->
   <div class="screen" id="screen-returning">
-    <div class="welcome-body">
-      <div style="font-size:56px; line-height:1">🦊</div>
+    <div class="welcome-body" style="justify-content:flex-start; padding-top:24px;">
+      <div style="font-size:48px; line-height:1">🦊</div>
       <div class="welcome-title">Welcome back</div>
-      <div class="welcome-sub">Your environment is already set up. What would you like to do?</div>
+      <div class="pr-current" id="returning-pr-current"></div>
+
+      <div class="pr-section" id="returning-pr-section">
+        <div class="pr-input-row">
+          <input class="pr-input" id="returning-pr-input" type="text" placeholder="PR # or GitHub URL..." autocomplete="off" spellcheck="false" />
+          <button class="pr-go-btn" id="returning-pr-go" disabled onclick="switchToPr('returning')">Switch</button>
+        </div>
+        <div class="pr-preview" id="returning-pr-preview"></div>
+        <div class="pr-status-msg" id="returning-pr-status"></div>
+        <div class="pr-filters" id="returning-pr-filters"></div>
+        <div class="pr-list-label">Recent open PRs</div>
+        <div class="pr-list" id="returning-pr-list"><div style="color:#555; font-size:12px; padding:8px;">Loading...</div></div>
+      </div>
     </div>
     <div class="footer-actions">
       <button class="btn btn-primary" onclick="launchOnly()">Launch MetaMask</button>
@@ -514,14 +810,42 @@
 
   <!-- ── Screen: Done ── -->
   <div class="screen" id="screen-done">
-    <div class="done-body">
+    <div class="update-banner" id="update-banner"></div>
+    <div class="done-body" style="justify-content:flex-start; padding-top:24px;">
       <div class="done-check">✓</div>
       <div class="welcome-title">You're all set!</div>
-      <div class="welcome-sub">MetaMask is running in the iOS Simulator and connected to the bundler.</div>
-      <div style="font-size:12px; color:#555; margin-top:4px;">Next time you open this app, it will launch MetaMask in seconds.</div>
+      <div class="pr-current" id="done-pr-current"></div>
+
+      <div class="pr-section" id="done-pr-section">
+        <div class="pr-input-row">
+          <input class="pr-input" id="done-pr-input" type="text" placeholder="Switch PR — enter # or URL..." autocomplete="off" spellcheck="false" />
+          <button class="pr-go-btn" id="done-pr-go" disabled onclick="switchToPr('done')">Switch</button>
+        </div>
+        <div class="pr-preview" id="done-pr-preview"></div>
+        <div class="pr-status-msg" id="done-pr-status"></div>
+        <div class="pr-filters" id="done-pr-filters"></div>
+        <div class="pr-list-label">Recent open PRs</div>
+        <div class="pr-list" id="done-pr-list"><div style="color:#555; font-size:12px; padding:8px;">Loading...</div></div>
+      </div>
+
+      <div class="crash-banner" id="crash-banner">
+        <span>Metro bundler crashed</span>
+        <button onclick="restartServer()">Restart</button>
+      </div>
     </div>
-    <div class="footer-actions" style="margin-top:16px;">
-      <button class="btn btn-secondary" onclick="switchBuild()">Download a different build from Runway</button>
+    <div class="footer-actions" style="margin-top:12px;">
+      <div class="action-row">
+        <button class="btn btn-secondary btn-sm" onclick="restartServer()">Restart Server</button>
+        <button class="btn btn-secondary btn-sm" onclick="reloadJs()">Reload JS</button>
+      </div>
+      <div class="action-row">
+        <button class="btn btn-secondary btn-sm" onclick="switchBuild()">New Runway Build</button>
+        <div class="appearance-toggle">
+          <button class="appearance-btn active" id="btn-dark" onclick="setAppearance('dark')" title="Dark mode">🌙</button>
+          <button class="appearance-btn" id="btn-light" onclick="setAppearance('light')" title="Light mode">☀️</button>
+        </div>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="switchToMain()">Back to main</button>
     </div>
   </div>
 
@@ -555,6 +879,15 @@ api.onProgress((type, data) => {
     updateStep(data.step, data.status, data.detail)
   } else if (type === 'error') {
     showRunningError(data)
+  } else if (type === 'bundler-crashed') {
+    const banner = document.getElementById('crash-banner')
+    if (banner && currentScreen === 'done') banner.classList.add('visible')
+  } else if (type === 'update-available') {
+    const banner = document.getElementById('update-banner')
+    if (banner) {
+      banner.textContent = 'Update v' + data.version + ' available — it will install automatically on next restart.'
+      banner.classList.add('visible')
+    }
   }
 })
 
@@ -603,6 +936,7 @@ async function startSetup() {
   // Already set up — let the user choose
   if (state.setupComplete) {
     showScreen('returning')
+    loadPrPicker('returning')
     return
   }
 
@@ -702,6 +1036,7 @@ async function launchOnly() {
     return
   }
   showScreen('done')
+  loadPrPicker('done')
 }
 
 async function launchWithNewBuild() {
@@ -723,6 +1058,7 @@ async function launchWithNewBuild() {
     return
   }
   showScreen('done')
+  loadPrPicker('done')
 }
 
 async function switchBuild() {
@@ -739,6 +1075,289 @@ async function switchBuild() {
     return
   }
   showScreen('done')
+  loadPrPicker('done')
+}
+
+// ── PR Picker ──
+let prCache = []
+let lookupTimer = null
+let activeFilter = 'all'
+
+const TEAM_FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'design-system', label: 'Design System', match: ['team-design-system', 'design-system', 'design system'] },
+  { id: 'ux', label: 'UX', match: ['team-mobile-ux', 'ux', 'mobile-ux'] },
+  { id: 'design', label: 'Design', match: ['design', 'team-design'] },
+  { id: 'tokens', label: 'Tokens', match: ['design-token', 'tokens', 'token'] },
+]
+
+function updateCurrentLabel(prefix) {
+  const el = document.getElementById(prefix + '-pr-current')
+  if (!el) return
+  const s = state
+  if (s.currentPr) {
+    el.innerHTML = 'Running <strong>PR #' + s.currentPr.number + '</strong> — ' + escapeHtml(s.currentPr.title)
+  } else if (s.currentBranch) {
+    el.innerHTML = 'On branch <strong>' + escapeHtml(s.currentBranch) + '</strong>'
+  } else {
+    el.innerHTML = ''
+  }
+}
+
+function escapeHtml(str) {
+  const d = document.createElement('div')
+  d.textContent = str
+  return d.innerHTML
+}
+
+async function loadPrPicker(prefix) {
+  state = await api.getState()
+  updateCurrentLabel(prefix)
+
+  // Hide crash banner on fresh load
+  const crashBanner = document.getElementById('crash-banner')
+  if (crashBanner) crashBanner.classList.remove('visible')
+
+  const input = document.getElementById(prefix + '-pr-input')
+  const goBtn = document.getElementById(prefix + '-pr-go')
+  const preview = document.getElementById(prefix + '-pr-preview')
+  const list = document.getElementById(prefix + '-pr-list')
+
+  // Render team filter chips
+  renderFilterChips(prefix)
+
+  // Debounced PR lookup as user types
+  input.oninput = () => {
+    const val = input.value.trim()
+    goBtn.disabled = !val
+    preview.classList.remove('visible')
+
+    clearTimeout(lookupTimer)
+    if (val.length >= 3 || /^\d+$/.test(val)) {
+      lookupTimer = setTimeout(() => lookupPrPreview(prefix, val), 600)
+    }
+
+    renderPrList(prefix, val)
+  }
+
+  // Load open PRs
+  list.innerHTML = '<div style="color:#555; font-size:12px; padding:8px;">Loading open PRs...</div>'
+  const result = await api.runStep('list-prs')
+  if (result.ok) {
+    prCache = result.data.prs
+    renderPrList(prefix, '')
+  } else {
+    list.innerHTML = '<div style="color:#ff7777; font-size:12px; padding:8px;">' + (result.error || 'Could not load PRs') + '</div>'
+  }
+}
+
+function renderFilterChips(prefix) {
+  const container = document.getElementById(prefix + '-pr-filters')
+  if (!container) return
+  container.innerHTML = TEAM_FILTERS.map(f =>
+    '<span class="pr-filter-chip' + (activeFilter === f.id ? ' active' : '') + '" data-filter="' + f.id + '">' + f.label + '</span>'
+  ).join('')
+  container.querySelectorAll('.pr-filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      activeFilter = chip.dataset.filter
+      renderFilterChips(prefix)
+      renderPrList(prefix, document.getElementById(prefix + '-pr-input').value.trim())
+    })
+  })
+}
+
+async function lookupPrPreview(prefix, input) {
+  const prNum = parsePrInput(input)
+  if (!prNum) return
+
+  const preview = document.getElementById(prefix + '-pr-preview')
+  preview.innerHTML = '<div style="color:#555; font-size:12px;">Looking up PR #' + prNum + '...</div>'
+  preview.classList.add('visible')
+
+  const result = await api.runStep('lookup-pr', { pr: String(prNum) })
+  if (result.ok) {
+    const pr = result.data
+    const ghUrl = 'https://github.com/MetaMask/metamask-mobile/pull/' + pr.number
+    preview.innerHTML =
+      '<div class="pr-preview-title">#' + pr.number + ' — ' + escapeHtml(pr.title) + '</div>' +
+      '<div class="pr-preview-meta">by ' + escapeHtml(pr.author) + (pr.draft ? ' · Draft' : '') + '</div>' +
+      (pr.description ? '<div class="pr-preview-desc">' + escapeHtml(pr.description.split('\n').slice(0, 4).join(' ')) + '</div>' : '') +
+      '<a class="pr-preview-link" data-url="' + ghUrl + '">Open in GitHub ↗</a>'
+    preview.classList.add('visible')
+    preview.querySelector('.pr-preview-link')?.addEventListener('click', (e) => {
+      e.preventDefault()
+      api.openUrl(e.currentTarget.dataset.url)
+    })
+  } else {
+    preview.innerHTML = '<div style="color:#ff7777; font-size:12px;">' + escapeHtml(result.error || 'Not found') + '</div>'
+    preview.classList.add('visible')
+  }
+}
+
+function renderPrList(prefix, filter) {
+  const list = document.getElementById(prefix + '-pr-list')
+  const q = filter.toLowerCase().trim()
+
+  let filtered = prCache
+
+  // Apply team filter
+  if (activeFilter !== 'all') {
+    const team = TEAM_FILTERS.find(f => f.id === activeFilter)
+    if (team && team.match) {
+      filtered = filtered.filter(pr =>
+        pr.labels.some(l => team.match.some(m => l.toLowerCase().includes(m))) ||
+        pr.title.toLowerCase().includes(activeFilter)
+      )
+    }
+  }
+
+  // Apply text filter
+  if (q && !/^\d+$/.test(q) && !q.includes('github.com')) {
+    filtered = filtered.filter(pr =>
+      pr.title.toLowerCase().includes(q) ||
+      pr.author.toLowerCase().includes(q) ||
+      pr.labels.some(l => l.toLowerCase().includes(q))
+    )
+  }
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<div style="color:#555; font-size:12px; padding:8px;">No matching PRs</div>'
+    return
+  }
+
+  list.innerHTML = filtered.slice(0, 20).map(pr =>
+    '<div class="pr-item" data-pr="' + pr.number + '">' +
+      '<div class="pr-item-header">' +
+        '<span class="pr-item-number">#' + pr.number + '</span>' +
+        '<span class="pr-item-title">' + escapeHtml(pr.title) + '</span>' +
+        (pr.draft ? '<span class="pr-item-draft">Draft</span>' : '') +
+      '</div>' +
+      '<div class="pr-item-meta">' + escapeHtml(pr.author) +
+        (pr.labels.length ? ' · ' + pr.labels.slice(0, 3).map(l => escapeHtml(l)).join(', ') : '') +
+      '</div>' +
+    '</div>'
+  ).join('')
+
+  list.querySelectorAll('.pr-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const num = item.dataset.pr
+      document.getElementById(prefix + '-pr-input').value = num
+      document.getElementById(prefix + '-pr-go').disabled = false
+      lookupPrPreview(prefix, num)
+    })
+  })
+}
+
+function parsePrInput(input) {
+  if (!input) return null
+  const trimmed = input.trim()
+  const urlMatch = trimmed.match(/\/pull\/(\d+)/)
+  if (urlMatch) return parseInt(urlMatch[1], 10)
+  const numMatch = trimmed.match(/^#?(\d+)$/)
+  if (numMatch) return parseInt(numMatch[1], 10)
+  return null
+}
+
+async function switchToPr(prefix) {
+  const input = document.getElementById(prefix + '-pr-input')
+  const goBtn = document.getElementById(prefix + '-pr-go')
+  const statusEl = document.getElementById(prefix + '-pr-status')
+  const val = input.value.trim()
+
+  if (!val) return
+
+  input.disabled = true
+  goBtn.disabled = true
+  statusEl.textContent = 'Switching to PR... (fetching, checkout, yarn install)'
+  statusEl.className = 'pr-status-msg'
+
+  const result = await api.runStep('switch-to-pr', { pr: val })
+
+  input.disabled = false
+  goBtn.disabled = false
+
+  if (result.ok) {
+    state = await api.getState()
+    updateCurrentLabel(prefix)
+    input.value = ''
+    document.getElementById(prefix + '-pr-preview').classList.remove('visible')
+
+    if (prefix === 'done') {
+      statusEl.textContent = 'Switched — restarting server...'
+      await doRestartServer()
+      statusEl.textContent = 'PR loaded — server restarted ✓'
+    } else {
+      statusEl.textContent = 'Switched ✓ — press Launch MetaMask to start'
+    }
+  } else {
+    statusEl.textContent = 'Switch failed: ' + (result.error || '')
+    statusEl.className = 'pr-status-msg error'
+  }
+}
+
+async function switchToMain() {
+  const statusEl = document.getElementById('done-pr-status')
+  statusEl.textContent = 'Switching to main...'
+  statusEl.className = 'pr-status-msg'
+
+  const result = await api.runStep('switch-to-main')
+  if (result.ok) {
+    state = await api.getState()
+    updateCurrentLabel('done')
+    statusEl.textContent = 'Switched to main — restarting server...'
+    await doRestartServer()
+    statusEl.textContent = 'On main — server restarted ✓'
+  } else {
+    statusEl.textContent = 'Switch failed: ' + (result.error || '')
+    statusEl.className = 'pr-status-msg error'
+  }
+}
+
+async function restartServer() {
+  const crashBanner = document.getElementById('crash-banner')
+  if (crashBanner) crashBanner.classList.remove('visible')
+  const statusEl = document.getElementById('done-pr-status')
+  if (statusEl) {
+    statusEl.textContent = 'Restarting server...'
+    statusEl.className = 'pr-status-msg'
+  }
+  await doRestartServer()
+  if (statusEl) {
+    statusEl.textContent = 'Server restarted ✓'
+    statusEl.className = 'pr-status-msg'
+  }
+}
+
+async function doRestartServer() {
+  const result = await api.runStep('restart-bundler')
+  if (!result.ok) {
+    const statusEl = document.getElementById('done-pr-status')
+    if (statusEl) {
+      statusEl.textContent = 'Restart failed: ' + (result.error || '')
+      statusEl.className = 'pr-status-msg error'
+    }
+  }
+}
+
+// ── Appearance toggle ──
+async function setAppearance(mode) {
+  document.getElementById('btn-dark').classList.toggle('active', mode === 'dark')
+  document.getElementById('btn-light').classList.toggle('active', mode === 'light')
+  await api.runStep('toggle-appearance', { mode })
+}
+
+// ── Reload JS ──
+async function reloadJs() {
+  const statusEl = document.getElementById('done-pr-status')
+  if (statusEl) {
+    statusEl.textContent = 'Reloading JS bundle...'
+    statusEl.className = 'pr-status-msg'
+  }
+  const result = await api.runStep('reload-js')
+  if (statusEl) {
+    statusEl.textContent = result.ok ? 'JS reloaded ✓' : 'Reload failed — ' + (result.error || '')
+    statusEl.className = result.ok ? 'pr-status-msg' : 'pr-status-msg error'
+  }
 }
 
 // ── Main setup sequence ──
@@ -756,6 +1375,7 @@ async function runFullSetup() {
   }
 
   showScreen('done')
+  loadPrPicker('done')
 }
 
 async function runStep(stepId) {
@@ -800,6 +1420,11 @@ window.launchAgain = launchAgain
 window.switchBuild = switchBuild
 window.launchOnly = launchOnly
 window.launchWithNewBuild = launchWithNewBuild
+window.restartServer = restartServer
+window.switchToPr = switchToPr
+window.switchToMain = switchToMain
+window.setAppearance = setAppearance
+window.reloadJs = reloadJs
 
 })() // end IIFE
 </script>

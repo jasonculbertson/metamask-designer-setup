@@ -14,7 +14,12 @@ interface State {
   infuraKey?: string
   installedBuild?: string
   setupComplete?: boolean
+  currentBranch?: string
+  currentPr?: { number: number; title: string; author: string; branch: string } | null
 }
+
+const GITHUB_REPO = 'MetaMask/metamask-mobile'
+const GITHUB_API = `https://api.github.com/repos/${GITHUB_REPO}`
 
 // Async exec that streams stdout/stderr lines to the log
 function run(
@@ -121,9 +126,26 @@ export class SetupRunner {
     this.emit('setup:progress', { step, status, detail })
   }
 
-  getState(): State { return this.state }
+  getState(): State {
+    if (fs.existsSync(path.join(REPO_DIR, '.git'))) {
+      try {
+        this.state.currentBranch = require('child_process')
+          .execSync('git branch --show-current', { encoding: 'utf8', cwd: REPO_DIR, env: this.env })
+          .trim()
+        // Clear stale PR info if we're on a different branch
+        if (this.state.currentPr && this.state.currentBranch !== this.state.currentPr.branch) {
+          this.state.currentPr = null
+        }
+      } catch { /* ignore */ }
+    }
+    return this.state
+  }
 
   cleanup() {
+    if (this._bundlerMonitor) {
+      clearInterval(this._bundlerMonitor)
+      this._bundlerMonitor = null
+    }
     if (this.bundlerPid) {
       try { process.kill(-this.bundlerPid) } catch { /* already gone */ }
       try { process.kill(this.bundlerPid) } catch { /* already gone */ }
@@ -143,6 +165,13 @@ export class SetupRunner {
         case 'download-build':    return await this.downloadBuild()
         case 'check-refine-ai':   return await this.checkRefineAi()
         case 'launch':            return await this.launch()
+        case 'list-prs':          return await this.listPrs(payload?.query ?? '')
+        case 'lookup-pr':         return await this.lookupPr(payload?.pr ?? '')
+        case 'switch-to-pr':      return await this.switchToPr(payload?.pr ?? '')
+        case 'switch-to-main':    return await this.switchBranch('main')
+        case 'restart-bundler':   return await this.restartBundler()
+        case 'toggle-appearance': return this.toggleAppearance(payload?.mode ?? 'dark')
+        case 'reload-js':        return await this.reloadJs()
         default: return { ok: false, error: `Unknown step: ${stepId}` }
       }
     } catch (e: unknown) {
@@ -494,6 +523,7 @@ export class SetupRunner {
     })
     this.bundlerPid = bundler.pid ?? null
     bundler.unref()
+    this.monitorBundler()
 
     // ── Step 3: Wait for Metro to be ready on port 8081 (max 3 min) ──
     const bundlerReady = await new Promise<boolean>((resolve) => {
@@ -570,6 +600,290 @@ export class SetupRunner {
     this.progress('launch', 'done')
     return { ok: true }
   }
+
+  private async githubGet(endpoint: string): Promise<any> {
+    const https = require('https')
+    const url = endpoint.startsWith('http') ? endpoint : `${GITHUB_API}${endpoint}`
+    return new Promise((resolve, reject) => {
+      https.get(url, { headers: { 'User-Agent': 'metamask-designer-setup', Accept: 'application/vnd.github+json' } }, (res: any) => {
+        let data = ''
+        res.on('data', (chunk: any) => data += chunk)
+        res.on('end', () => {
+          try { resolve(JSON.parse(data)) }
+          catch { reject(new Error(`GitHub API returned invalid JSON`)) }
+        })
+      }).on('error', reject)
+    })
+  }
+
+  private async listPrs(query: string): Promise<{ ok: boolean; error?: string; data?: unknown }> {
+    try {
+      const prs = await this.githubGet(`/pulls?state=open&sort=updated&direction=desc&per_page=30`)
+      if (!Array.isArray(prs)) {
+        return { ok: false, error: prs?.message || 'GitHub API error' }
+      }
+
+      const q = query.toLowerCase().trim()
+      const mapped = prs.map((pr: any) => ({
+        number: pr.number,
+        title: pr.title,
+        author: pr.user?.login ?? '',
+        branch: pr.head?.ref ?? '',
+        labels: (pr.labels ?? []).map((l: any) => l.name),
+        draft: pr.draft ?? false,
+        updated: pr.updated_at,
+      }))
+
+      const filtered = q
+        ? mapped.filter((pr: any) =>
+            pr.title.toLowerCase().includes(q) ||
+            pr.author.toLowerCase().includes(q) ||
+            String(pr.number).includes(q) ||
+            pr.labels.some((l: string) => l.toLowerCase().includes(q))
+          )
+        : mapped
+
+      const current = this.getCurrentBranch()
+      const activePr = this.state.currentPr ?? null
+
+      return { ok: true, data: { prs: filtered, currentBranch: current, activePr } }
+    } catch (e: unknown) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) }
+    }
+  }
+
+  private async lookupPr(input: string): Promise<{ ok: boolean; error?: string; data?: unknown }> {
+    const prNumber = this.parsePrInput(input)
+    if (!prNumber) return { ok: false, error: 'Enter a PR number or paste a GitHub PR URL' }
+
+    try {
+      const pr = await this.githubGet(`/pulls/${prNumber}`)
+      if (pr.message) return { ok: false, error: `PR #${prNumber}: ${pr.message}` }
+
+      return {
+        ok: true,
+        data: {
+          number: pr.number,
+          title: pr.title,
+          author: pr.user?.login ?? '',
+          branch: pr.head?.ref ?? '',
+          description: (pr.body ?? '').slice(0, 500),
+          labels: (pr.labels ?? []).map((l: any) => l.name),
+          draft: pr.draft ?? false,
+        },
+      }
+    } catch (e: unknown) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) }
+    }
+  }
+
+  private async switchToPr(input: string): Promise<{ ok: boolean; error?: string }> {
+    const prNumber = this.parsePrInput(input)
+    if (!prNumber) return { ok: false, error: 'Enter a PR number or paste a GitHub PR URL' }
+
+    const log = this.log.bind(this)
+    log(`Looking up PR #${prNumber}...`)
+
+    const pr = await this.githubGet(`/pulls/${prNumber}`)
+    if (pr.message) return { ok: false, error: `PR #${prNumber}: ${pr.message}` }
+
+    const branch = pr.head?.ref
+    if (!branch) return { ok: false, error: 'Could not determine branch for this PR' }
+
+    log(`PR #${prNumber}: ${pr.title}`)
+    log(`Branch: ${branch} by ${pr.user?.login}`)
+
+    return await this.switchBranchInternal(branch, {
+      number: pr.number,
+      title: pr.title,
+      author: pr.user?.login ?? '',
+      branch,
+    })
+  }
+
+  private async switchBranch(branch: string): Promise<{ ok: boolean; error?: string }> {
+    if (!branch) return { ok: false, error: 'No branch specified' }
+    return await this.switchBranchInternal(branch, null)
+  }
+
+  private async switchBranchInternal(
+    branch: string,
+    prInfo: { number: number; title: string; author: string; branch: string } | null
+  ): Promise<{ ok: boolean; error?: string }> {
+    const log = this.log.bind(this)
+
+    this.cleanup()
+    log(`Stopping bundler...`)
+    await new Promise(r => setTimeout(r, 1000))
+
+    // Need to unshallow if the repo was cloned with --depth=1
+    try {
+      const isShallow = require('child_process')
+        .execSync('git rev-parse --is-shallow-repository', { encoding: 'utf8', cwd: REPO_DIR, env: this.env })
+        .trim()
+      if (isShallow === 'true') {
+        log('Fetching full history (one-time, needed for branch switching)...')
+        await runWithLog('git', ['fetch', '--unshallow'], log, { cwd: REPO_DIR, env: this.env })
+      }
+    } catch { /* not shallow or git error — continue */ }
+
+    // Stash any local changes so checkout never fails due to a dirty tree
+    try {
+      const status = require('child_process')
+        .execSync('git status --porcelain', { encoding: 'utf8', cwd: REPO_DIR, env: this.env })
+        .trim()
+      if (status) {
+        log('Stashing local changes...')
+        await runWithLog('git', ['stash', 'push', '--include-untracked', '-m', 'metamask-designer-setup auto-stash'], log, { cwd: REPO_DIR, env: this.env })
+      }
+    } catch { /* ignore stash errors */ }
+
+    log(`Fetching remote branches...`)
+    await runWithLog('git', ['fetch', 'origin'], log, { cwd: REPO_DIR, env: this.env })
+
+    log(`Switching to ${branch}...`)
+    // -f forces checkout even if index is dirty after stash
+    await runWithLog('git', ['checkout', '-f', branch], log, { cwd: REPO_DIR, env: this.env })
+      .catch(() => runWithLog('git', ['checkout', '-f', '-b', branch, `origin/${branch}`], log, { cwd: REPO_DIR, env: this.env }))
+
+    log('Pulling latest...')
+    await runWithLog('git', ['pull', '--ff-only'], log, { cwd: REPO_DIR, env: this.env })
+      .catch(() => { log('Pull skipped (may be detached or no upstream)') })
+
+    log('Reinstalling dependencies...')
+    await runWithLog('yarn', ['install'], log, { cwd: REPO_DIR, env: this.env })
+
+    this.state.currentBranch = branch
+    this.state.currentPr = prInfo
+    this.saveState()
+    log(`Switched to ${branch} ✓`)
+    return { ok: true }
+  }
+
+  private parsePrInput(input: string): number | null {
+    if (!input) return null
+    const trimmed = input.trim()
+    // Full URL: https://github.com/MetaMask/metamask-mobile/pull/28576
+    const urlMatch = trimmed.match(/\/pull\/(\d+)/)
+    if (urlMatch) return parseInt(urlMatch[1], 10)
+    // Just a number: 28576 or #28576
+    const numMatch = trimmed.match(/^#?(\d+)$/)
+    if (numMatch) return parseInt(numMatch[1], 10)
+    return null
+  }
+
+  private getCurrentBranch(): string {
+    try {
+      return require('child_process')
+        .execSync('git branch --show-current', { encoding: 'utf8', cwd: REPO_DIR, env: this.env })
+        .trim()
+    } catch { return '' }
+  }
+
+  private async restartBundler(): Promise<{ ok: boolean; error?: string }> {
+    const log = this.log.bind(this)
+    log('Stopping bundler...')
+    this.cleanup()
+    // Also kill anything on port 8081 in case a stale process is hanging
+    try {
+      require('child_process').execSync('lsof -ti:8081 | xargs kill -9 2>/dev/null || true', { env: this.env, stdio: 'ignore' })
+    } catch { /* nothing on port */ }
+    await new Promise(r => setTimeout(r, 2000))
+
+    // Ensure corepack
+    try {
+      require('child_process').execSync('corepack enable 2>/dev/null || sudo corepack enable 2>/dev/null || true', {
+        env: this.env, stdio: 'ignore',
+      })
+    } catch { /* best-effort */ }
+
+    const bundlerLog = path.join(os.tmpdir(), 'metamask-bundler.log')
+    log('Starting Metro bundler...')
+    const logFd = require('fs').openSync(bundlerLog, 'w')
+    const bundler = spawn('yarn', ['watch:clean'], {
+      cwd: REPO_DIR,
+      env: { ...this.env, METAMASK_ENVIRONMENT: 'dev', METAMASK_BUILD_TYPE: 'main' },
+      detached: true,
+      stdio: ['ignore', logFd, logFd],
+    })
+    this.bundlerPid = bundler.pid ?? null
+    bundler.unref()
+    this.monitorBundler()
+
+    // Wait for bundler ready
+    const ready = await new Promise<boolean>((resolve) => {
+      const start = Date.now()
+      const poll = () => {
+        try {
+          require('child_process').execSync('curl -sf http://localhost:8081/status > /dev/null', { env: this.env, stdio: 'ignore' })
+          resolve(true)
+        } catch {
+          if (Date.now() - start < 120000) setTimeout(poll, 3000)
+          else resolve(false)
+        }
+      }
+      setTimeout(poll, 5000)
+    })
+
+    if (ready) {
+      log('Bundler is ready ✓')
+    } else {
+      log('Bundler taking longer than expected — it may still be starting')
+    }
+
+    // Relaunch MetaMask with deep link
+    const bundlerUrl = encodeURIComponent('http://localhost:8081')
+    await runShell(`xcrun simctl launch booted io.metamask.MetaMask 2>/dev/null || true`, log, undefined, this.env)
+    await new Promise(r => setTimeout(r, 2000))
+    await runShell(
+      `xcrun simctl openurl booted "expo-metamask://expo-development-client/?url=${bundlerUrl}" 2>/dev/null || true`,
+      log, undefined, this.env
+    )
+
+    log('MetaMask relaunched ✓')
+    return { ok: true }
+  }
+
+  private toggleAppearance(mode: string): { ok: boolean; error?: string } {
+    try {
+      require('child_process').execSync(
+        `xcrun simctl ui booted appearance ${mode === 'light' ? 'light' : 'dark'}`,
+        { env: this.env, stdio: 'ignore' }
+      )
+      return { ok: true }
+    } catch (e: unknown) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) }
+    }
+  }
+
+  private async reloadJs(): Promise<{ ok: boolean; error?: string }> {
+    try {
+      require('child_process').execSync(
+        'curl -sf http://localhost:8081/reload',
+        { env: this.env, stdio: 'ignore', timeout: 5000 }
+      )
+      return { ok: true }
+    } catch {
+      return { ok: false, error: 'Metro bundler is not responding on port 8081' }
+    }
+  }
+
+  private monitorBundler() {
+    if (!this.bundlerPid) return
+    const pid = this.bundlerPid
+    this._bundlerMonitor = setInterval(() => {
+      try {
+        process.kill(pid, 0)
+      } catch {
+        clearInterval(this._bundlerMonitor!)
+        this._bundlerMonitor = null
+        this.bundlerPid = null
+        this.emit('setup:bundler-crashed', 'Metro bundler stopped unexpectedly')
+      }
+    }, 5000)
+  }
+
+  private _bundlerMonitor: ReturnType<typeof setInterval> | null = null
 
   private async checkRefineAi(): Promise<{ ok: boolean; error?: string }> {
     this.progress('refine-ai', 'running', 'Checking Refine AI...')
