@@ -4,13 +4,13 @@ One-click app for designers to run **MetaMask Mobile** in the iOS Simulator — 
 
 ## Download
 
-**[Download v1.0.3 (Apple Silicon)](https://github.com/jasonculbertson/metamask-designer-setup/releases/download/v1.0.3/MetaMask%20Designer%20Setup-1.0.3-arm64.dmg)**
+**[Download v1.0.3 (Apple Silicon)](https://github.com/jasonculbertson/metamask-designer-setup/releases/download/v1.0.3/MetaMask.Designer.Setup-1.0.3-arm64.dmg)**
 
 Requires an Apple Silicon Mac (M1/M2/M3 or later) running macOS.
 
 ---
 
-## What's in v1.0.2
+## What's in v1.0.3
 
 - **PR switcher** — search open PRs by title, author, or label and switch with one click (runs `git checkout` + `yarn install` automatically)
 - **Team filters** — filter PRs by team (Design System, UX, Design, Tokens)
@@ -18,7 +18,8 @@ Requires an Apple Silicon Mac (M1/M2/M3 or later) running macOS.
 - **Dark / Light mode toggle** — switch the iOS Simulator appearance without leaving the app
 - **Reload JS** — fast-reload the bundle without restarting Metro
 - **Metro crash detection** — alerts you if the bundler crashes with a one-click restart
-- **Auto-update** — checks for new versions on launch and installs them in the background
+- **Auto-update** — checks for new versions on every launch and installs them in the background
+- **Fixed: PR switch failing** — stashes local changes before checkout so git never blocks a branch switch
 
 ---
 
