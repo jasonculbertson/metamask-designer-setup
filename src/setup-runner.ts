@@ -711,16 +711,24 @@ export class SetupRunner {
     prInfo: { number: number; title: string; author: string; branch: string } | null
   ): Promise<{ ok: boolean; error?: string }> {
     const log = this.log.bind(this)
+    const exec = (cmd: string) => require('child_process').execSync(cmd, { encoding: 'utf8', cwd: REPO_DIR, env: this.env }).trim()
 
     this.cleanup()
     log(`Stopping bundler...`)
     await new Promise(r => setTimeout(r, 1000))
 
+    // Remove stale lock file if present — causes git exit 128
+    try {
+      const lockFile = require('path').join(REPO_DIR, '.git', 'index.lock')
+      if (require('fs').existsSync(lockFile)) {
+        require('fs').unlinkSync(lockFile)
+        log('Removed stale .git/index.lock')
+      }
+    } catch { /* ignore */ }
+
     // Need to unshallow if the repo was cloned with --depth=1
     try {
-      const isShallow = require('child_process')
-        .execSync('git rev-parse --is-shallow-repository', { encoding: 'utf8', cwd: REPO_DIR, env: this.env })
-        .trim()
+      const isShallow = exec('git rev-parse --is-shallow-repository')
       if (isShallow === 'true') {
         log('Fetching full history (one-time, needed for branch switching)...')
         await runWithLog('git', ['fetch', '--unshallow'], log, { cwd: REPO_DIR, env: this.env })
@@ -729,26 +737,32 @@ export class SetupRunner {
 
     // Stash any local changes so checkout never fails due to a dirty tree
     try {
-      const status = require('child_process')
-        .execSync('git status --porcelain', { encoding: 'utf8', cwd: REPO_DIR, env: this.env })
-        .trim()
+      const status = exec('git status --porcelain')
       if (status) {
         log('Stashing local changes...')
         await runWithLog('git', ['stash', 'push', '--include-untracked', '-m', 'metamask-designer-setup auto-stash'], log, { cwd: REPO_DIR, env: this.env })
+          .catch(() => runWithLog('git', ['checkout', '--', '.'], log, { cwd: REPO_DIR, env: this.env }))
       }
-    } catch { /* ignore stash errors */ }
+    } catch { /* ignore */ }
 
     log(`Fetching remote branches...`)
-    await runWithLog('git', ['fetch', 'origin'], log, { cwd: REPO_DIR, env: this.env })
+    await runWithLog('git', ['fetch', 'origin', '--prune', '--no-tags'], log, { cwd: REPO_DIR, env: this.env })
+      .catch((e: Error) => { throw new Error(`fetch failed: ${e.message}`) })
 
     log(`Switching to ${branch}...`)
-    // -f forces checkout even if index is dirty after stash
-    await runWithLog('git', ['checkout', '-f', branch], log, { cwd: REPO_DIR, env: this.env })
-      .catch(() => runWithLog('git', ['checkout', '-f', '-b', branch, `origin/${branch}`], log, { cwd: REPO_DIR, env: this.env }))
+    const switched = await runWithLog('git', ['checkout', '-f', branch], log, { cwd: REPO_DIR, env: this.env })
+      .then(() => true)
+      .catch(() => false)
+
+    if (!switched) {
+      // Branch doesn't exist locally — create tracking branch from origin
+      await runWithLog('git', ['checkout', '-f', '-b', branch, `origin/${branch}`], log, { cwd: REPO_DIR, env: this.env })
+        .catch((e: Error) => { throw new Error(`checkout failed — branch "${branch}" not found on origin. ${e.message}`) })
+    }
 
     log('Pulling latest...')
     await runWithLog('git', ['pull', '--ff-only'], log, { cwd: REPO_DIR, env: this.env })
-      .catch(() => { log('Pull skipped (may be detached or no upstream)') })
+      .catch(() => { log('Pull skipped (detached HEAD or no upstream)') })
 
     log('Reinstalling dependencies...')
     await runWithLog('yarn', ['install'], log, { cwd: REPO_DIR, env: this.env })
