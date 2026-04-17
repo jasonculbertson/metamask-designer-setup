@@ -1023,11 +1023,9 @@ async function continueWithInfura() {
 async function launchOnly() {
   showScreen('running')
   resetStepUI()
+  // Refine AI is optional — warn but never block launch
   const refineResult = await api.runStep('check-refine-ai')
-  if (!refineResult.ok) {
-    showRunningError('Refine AI check failed: ' + (refineResult.error || ''))
-    return
-  }
+  if (!refineResult.ok) appendLog('⚠️ Refine AI check skipped: ' + (refineResult.error || ''))
   const launchResult = await api.runStep('launch')
   if (!launchResult.ok) {
     showRunningError(launchResult.error || 'Launch failed')
@@ -1040,11 +1038,9 @@ async function launchOnly() {
 async function launchWithNewBuild() {
   showScreen('running')
   resetStepUI()
+  // Refine AI is optional — warn but never block launch
   const refineResult = await api.runStep('check-refine-ai')
-  if (!refineResult.ok) {
-    showRunningError('Refine AI check failed: ' + (refineResult.error || ''))
-    return
-  }
+  if (!refineResult.ok) appendLog('⚠️ Refine AI check skipped: ' + (refineResult.error || ''))
   const buildResult = await api.runStep('download-build')
   if (!buildResult.ok) {
     showRunningError('Build download failed: ' + (buildResult.error || ''))
@@ -1264,26 +1260,26 @@ async function switchToPr(prefix) {
 
   if (!val) return
 
-  input.disabled = true
-  goBtn.disabled = true
+  // Disable all action buttons during switch to prevent concurrent operations
+  setActionButtonsDisabled(true)
   statusEl.textContent = 'Switching to PR... (fetching, checkout, yarn install)'
   statusEl.className = 'pr-status-msg'
 
   const result = await api.runStep('switch-to-pr', { pr: val })
 
-  input.disabled = false
-  goBtn.disabled = false
+  setActionButtonsDisabled(false)
 
   if (result.ok) {
     state = await api.getState()
     updateCurrentLabel(prefix)
     input.value = ''
+    goBtn.disabled = true
     document.getElementById(prefix + '-pr-preview').classList.remove('visible')
 
     if (prefix === 'done') {
       statusEl.textContent = 'Switched — restarting server...'
-      await doRestartServer()
-      statusEl.textContent = 'PR loaded — server restarted ✓'
+      const restartOk = await doRestartServer()
+      if (restartOk) statusEl.textContent = 'PR loaded — server restarted ✓'
     } else {
       statusEl.textContent = 'Switched ✓ — press Launch MetaMask to start'
     }
@@ -1293,18 +1289,30 @@ async function switchToPr(prefix) {
   }
 }
 
+function setActionButtonsDisabled(disabled) {
+  const ids = ['done-pr-go', 'returning-pr-go']
+  ids.forEach(id => { const el = document.getElementById(id); if (el) el.disabled = disabled })
+  // Disable footer buttons by class during operations
+  document.querySelectorAll('#screen-done .btn, #screen-done .pr-go-btn').forEach(btn => {
+    btn.disabled = disabled
+  })
+}
+
 async function switchToMain() {
   const statusEl = document.getElementById('done-pr-status')
   statusEl.textContent = 'Switching to main...'
   statusEl.className = 'pr-status-msg'
 
+  setActionButtonsDisabled(true)
   const result = await api.runStep('switch-to-main')
+  setActionButtonsDisabled(false)
+
   if (result.ok) {
     state = await api.getState()
     updateCurrentLabel('done')
     statusEl.textContent = 'Switched to main — restarting server...'
-    await doRestartServer()
-    statusEl.textContent = 'On main — server restarted ✓'
+    const restartOk = await doRestartServer()
+    if (restartOk) statusEl.textContent = 'On main — server restarted ✓'
   } else {
     statusEl.textContent = 'Switch failed: ' + (result.error || '')
     statusEl.className = 'pr-status-msg error'
@@ -1319,13 +1327,16 @@ async function restartServer() {
     statusEl.textContent = 'Restarting server...'
     statusEl.className = 'pr-status-msg'
   }
-  await doRestartServer()
-  if (statusEl) {
+  setActionButtonsDisabled(true)
+  const ok = await doRestartServer()
+  setActionButtonsDisabled(false)
+  if (statusEl && ok) {
     statusEl.textContent = 'Server restarted ✓'
     statusEl.className = 'pr-status-msg'
   }
 }
 
+// Returns true on success, false on failure (also sets error message)
 async function doRestartServer() {
   const result = await api.runStep('restart-bundler')
   if (!result.ok) {
@@ -1334,7 +1345,9 @@ async function doRestartServer() {
       statusEl.textContent = 'Restart failed: ' + (result.error || '')
       statusEl.className = 'pr-status-msg error'
     }
+    return false
   }
+  return true
 }
 
 // ── Auto-update UI ──
@@ -1348,11 +1361,9 @@ function showUpdateBanner(status, version) {
     banner.textContent = `Downloading update… ${version}%`
     banner.classList.add('visible')
   } else if (status === 'ready') {
-    banner.innerHTML = `Update ready — <a href="#" onclick="event.preventDefault(); api.runStep('noop')" style="color:#93bbfc">restart to install</a>`
+    banner.innerHTML = `Update ready — quit and reopen the app to install`
     banner.classList.add('visible')
-    api.onProgress(() => {}) // keep listener alive
     window.__updateReady = true
-    rebuildMenuState('ready')
   } else if (status === 'up-to-date') {
     banner.textContent = ''
     banner.classList.remove('visible')
@@ -1364,10 +1375,6 @@ function handleUpdateStatus(data) {
   else if (data.status === 'downloading') showUpdateBanner('downloading', data.percent)
   else if (data.status === 'ready') showUpdateBanner('ready', '')
   else if (data.status === 'up-to-date') showUpdateBanner('up-to-date', '')
-}
-
-function rebuildMenuState(state) {
-  try { window.api && ipcRenderer?.send('update-state-changed', state) } catch { /* ignore */ }
 }
 
 // ── Appearance toggle ──

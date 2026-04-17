@@ -4,13 +4,13 @@ One-click app for designers to run **MetaMask Mobile** in the iOS Simulator — 
 
 ## Download
 
-**[Download v1.0.4 (Apple Silicon)](https://github.com/jasonculbertson/metamask-designer-setup/releases/download/v1.0.4/MetaMask.Designer.Setup-1.0.4-arm64.dmg)**
+**[Download v1.0.6 (Apple Silicon)](https://github.com/jasonculbertson/metamask-designer-setup/releases/download/v1.0.6/MetaMask.Designer.Setup-1.0.6-arm64.dmg)**
 
 Requires an Apple Silicon Mac (M1/M2/M3 or later) running macOS.
 
 ---
 
-## What's in v1.0.4
+## What's in v1.0.6
 
 - **PR switcher** — search open PRs by title, author, or label and switch with one click (runs `git checkout` + `yarn install` automatically)
 - **Team filters** — filter PRs by team (Design System, UX, Design, Tokens)
@@ -19,7 +19,13 @@ Requires an Apple Silicon Mac (M1/M2/M3 or later) running macOS.
 - **Reload JS** — fast-reload the bundle without restarting Metro
 - **Metro crash detection** — alerts you if the bundler crashes with a one-click restart
 - **Auto-update** — checks for new versions on every launch and installs them in the background
-- **Fixed: PR switch git exit code 128** — removes stale `.git/index.lock`, stashes local changes, and provides clear error messages if a switch fails
+- **Fixed: Refine AI failure no longer blocks launch** — was silently aborting the whole launch
+- **Fixed: Restart Server shows correct status** — previously showed success even when it failed
+- **Fixed: PR switch buttons locked during operation** — prevents conflicting git commands running at the same time
+- **Fixed: Simulator boot no longer starts multiple simulators** — was accidentally booting 3 devices
+- **Fixed: Build reinstall respects actual simulator state** — no longer skips install if app was wiped from simulator
+- **Fixed: Bundler restart shows live log** — see what Metro is doing during the startup wait
+- **Fixed: git pull skipped on PR branches** — prevents failures when reopening on a PR branch
 
 ---
 

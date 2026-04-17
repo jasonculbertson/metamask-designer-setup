@@ -308,8 +308,15 @@ export class SetupRunner {
     const log = this.log.bind(this)
 
     if (fs.existsSync(path.join(REPO_DIR, '.git'))) {
-      log('Pulling latest metamask-mobile...')
-      await runWithLog('git', ['pull'], log, { cwd: REPO_DIR, env: this.env })
+      // Only pull if on main — pulling on a PR branch would fail or pull wrong code
+      const currentBranch = this.getCurrentBranch()
+      if (!currentBranch || currentBranch === 'main') {
+        log('Pulling latest metamask-mobile...')
+        await runWithLog('git', ['pull'], log, { cwd: REPO_DIR, env: this.env })
+          .catch(() => log('Pull skipped — working tree may have local changes'))
+      } else {
+        log(`Skipping pull — on branch "${currentBranch}" (use Switch PR to update)`)
+      }
     } else {
       log('Cloning MetaMask/metamask-mobile (this may take a minute)...')
       await runWithLog('git', [
@@ -387,27 +394,45 @@ export class SetupRunner {
   }
 
   private bootSimulator(log: (msg: string) => void): { ok: boolean; error?: string } {
-    require('child_process').spawnSync('/bin/bash', ['-c', [
-      'xcrun simctl boot "iPhone 16" 2>/dev/null',
-      'xcrun simctl boot "iPhone 16 Pro" 2>/dev/null',
-      'xcrun simctl boot "iPhone 15" 2>/dev/null',
-      'xcrun simctl boot "iPhone 15 Pro" 2>/dev/null',
-      'DEVICE=$(xcrun simctl list devices available -j 2>/dev/null | python3 -c "import sys,json; devs=json.load(sys.stdin)[\'devices\']; phones=[d[\'udid\'] for r in devs for d in devs[r] if \'iPhone\' in d.get(\'name\',\'\') and d.get(\'state\')==\'Shutdown\']; print(phones[0] if phones else \'\')" 2>/dev/null) && [ -n "$DEVICE" ] && xcrun simctl boot "$DEVICE" 2>/dev/null',
-    ].join(' || ')], { env: this.env, stdio: 'pipe' })
+    // Check if any simulator is already booted first — avoid booting multiple
+    try {
+      const bootedCheck = require('child_process').execSync(
+        'xcrun simctl list devices booted -j', { encoding: 'utf8', env: this.env }
+      )
+      const bootedDevices = JSON.parse(bootedCheck)
+      const anyBooted = Object.values(bootedDevices.devices as Record<string, any[]>)
+        .flat().some((d: any) => d.state === 'Booted')
+      if (anyBooted) {
+        log('Simulator already booted ✓')
+        return { ok: true }
+      }
+    } catch { /* continue to boot */ }
 
-    const bootedCheck = require('child_process').execSync(
-      'xcrun simctl list devices booted -j', { encoding: 'utf8', env: this.env }
-    )
-    const bootedDevices = JSON.parse(bootedCheck)
-    const anyBooted = Object.values(bootedDevices.devices as Record<string, any[]>)
-      .flat().some((d: any) => d.state === 'Booted')
-
-    if (!anyBooted) {
-      log('No simulator could be booted. Open Xcode → Settings → Platforms and install an iOS Simulator runtime.')
-      return { ok: false, error: 'No iOS Simulator available. Open Xcode → Settings → Platforms and download an iOS Simulator runtime, then try again.' }
+    // No simulator booted — boot the best available iPhone
+    const preferredDevices = ['iPhone 16', 'iPhone 16 Pro', 'iPhone 15', 'iPhone 15 Pro']
+    for (const device of preferredDevices) {
+      try {
+        require('child_process').execSync(`xcrun simctl boot "${device}" 2>/dev/null`, { env: this.env, stdio: 'pipe' })
+        log(`Booted ${device} ✓`)
+        return { ok: true }
+      } catch { /* try next */ }
     }
-    log('Simulator booted ✓')
-    return { ok: true }
+
+    // Fall back to any available iPhone
+    try {
+      const udid = require('child_process').execSync(
+        `xcrun simctl list devices available -j | python3 -c "import sys,json; devs=json.load(sys.stdin)['devices']; phones=[d['udid'] for r in devs for d in devs[r] if 'iPhone' in d.get('name','') and d.get('state')=='Shutdown']; print(phones[0] if phones else '')"`,
+        { encoding: 'utf8', env: this.env }
+      ).trim()
+      if (udid) {
+        require('child_process').execSync(`xcrun simctl boot "${udid}"`, { env: this.env, stdio: 'pipe' })
+        log('Simulator booted ✓')
+        return { ok: true }
+      }
+    } catch { /* fall through */ }
+
+    log('No simulator could be booted. Open Xcode → Settings → Platforms and install an iOS Simulator runtime.')
+    return { ok: false, error: 'No iOS Simulator available. Open Xcode → Settings → Platforms and download an iOS Simulator runtime, then try again.' }
   }
 
   private async downloadBuild(): Promise<{ ok: boolean; error?: string }> {
@@ -424,9 +449,22 @@ export class SetupRunner {
     const buildId = result.filename.replace('.app.zip', '')
 
     if (this.state.installedBuild === buildId) {
-      log(`Build ${buildId} already installed ✓`)
-      this.progress('build', 'skipped', buildId)
-      return { ok: true }
+      // Verify the app is actually installed — don't just trust saved state
+      const actuallyInstalled = (() => {
+        try {
+          require('child_process').execSync(
+            'xcrun simctl get_app_container booted io.metamask.MetaMask',
+            { env: this.env, stdio: 'ignore' }
+          )
+          return true
+        } catch { return false }
+      })()
+      if (actuallyInstalled) {
+        log(`Build ${buildId} already installed ✓`)
+        this.progress('build', 'skipped', buildId)
+        return { ok: true }
+      }
+      log(`Build ${buildId} was installed previously but is missing from Simulator — reinstalling...`)
     }
 
     const zipPath = path.join(os.tmpdir(), result.filename)
@@ -574,7 +612,40 @@ export class SetupRunner {
     )
     log('Bundle ready ✓')
 
-    // ── Step 4: Launch MetaMask and auto-connect via deep link ──
+    // ── Step 4: Ensure MetaMask is installed, then launch ──
+    const isInstalled = (() => {
+      try {
+        require('child_process').execSync(
+          'xcrun simctl get_app_container booted io.metamask.MetaMask',
+          { env: this.env, stdio: 'ignore' }
+        )
+        return true
+      } catch { return false }
+    })()
+
+    if (!isInstalled) {
+      log('MetaMask not found in Simulator — reinstalling from cached build...')
+      const appDir = path.join(os.tmpdir(), 'metamask-sim-app')
+      const renamedPath = path.join(os.tmpdir(), 'MetaMask.app')
+      let appPath: string | undefined
+
+      if (fs.existsSync(appDir)) {
+        appPath = require('child_process')
+          .execSync(`find "${appDir}" -name "*.app" -maxdepth 3`, { encoding: 'utf8', env: this.env })
+          .split('\n').filter(Boolean)[0]
+      }
+      if (!appPath && fs.existsSync(renamedPath)) appPath = renamedPath
+
+      if (appPath) {
+        await runWithLog('xcrun', ['simctl', 'install', 'booted', appPath], log, { env: this.env })
+        log('MetaMask reinstalled ✓')
+      } else {
+        log('No cached build found — downloading from Runway...')
+        const buildResult = await this.downloadBuild()
+        if (!buildResult.ok) return buildResult
+      }
+    }
+
     log('Launching MetaMask in Simulator...')
     const bundlerUrl = encodeURIComponent('http://localhost:8081')
     await runShell(`xcrun simctl launch booted io.metamask.MetaMask 2>/dev/null || true`, log, undefined, this.env)
@@ -821,7 +892,7 @@ export class SetupRunner {
     bundler.unref()
     this.monitorBundler()
 
-    // Wait for bundler ready
+    // Wait for bundler ready — show tail of log so user sees progress
     const ready = await new Promise<boolean>((resolve) => {
       const start = Date.now()
       const poll = () => {
@@ -829,6 +900,14 @@ export class SetupRunner {
           require('child_process').execSync('curl -sf http://localhost:8081/status > /dev/null', { env: this.env, stdio: 'ignore' })
           resolve(true)
         } catch {
+          const elapsed = Math.round((Date.now() - start) / 1000)
+          try {
+            const lastLine = require('child_process')
+              .execSync(`tail -1 "${bundlerLog}"`, { encoding: 'utf8', env: this.env }).trim()
+            if (lastLine) log(`Bundler (${elapsed}s): ${lastLine}`)
+            else log(`Waiting for bundler... ${elapsed}s`)
+          } catch { log(`Waiting for bundler... ${elapsed}s`) }
+
           if (Date.now() - start < 120000) setTimeout(poll, 3000)
           else resolve(false)
         }
@@ -842,6 +921,49 @@ export class SetupRunner {
       log('Bundler taking longer than expected — it may still be starting')
     }
 
+    // Make sure Simulator is open
+    await run('open', ['-a', 'Simulator'])
+    await new Promise(r => setTimeout(r, 1500))
+
+    // Boot a simulator if none is running
+    const bootStatus = this.bootSimulator(log)
+    if (!bootStatus.ok) return bootStatus
+
+    // Check if MetaMask is installed — if not, reinstall from cached build
+    const isInstalled = (() => {
+      try {
+        require('child_process').execSync(
+          'xcrun simctl get_app_container booted io.metamask.MetaMask',
+          { env: this.env, stdio: 'ignore' }
+        )
+        return true
+      } catch { return false }
+    })()
+
+    if (!isInstalled) {
+      log('MetaMask not found in Simulator — reinstalling from cached build...')
+      // Look for the cached .app in tmp
+      const appDir = path.join(os.tmpdir(), 'metamask-sim-app')
+      const renamedPath = path.join(os.tmpdir(), 'MetaMask.app')
+      let appPath: string | undefined
+
+      if (fs.existsSync(appDir)) {
+        appPath = require('child_process')
+          .execSync(`find "${appDir}" -name "*.app" -maxdepth 3`, { encoding: 'utf8', env: this.env })
+          .split('\n').filter(Boolean)[0]
+      }
+      if (!appPath && fs.existsSync(renamedPath)) appPath = renamedPath
+
+      if (appPath) {
+        log(`Reinstalling ${path.basename(appPath)}...`)
+        await runWithLog('xcrun', ['simctl', 'install', 'booted', appPath], log, { env: this.env })
+        log('MetaMask reinstalled ✓')
+      } else {
+        log('⚠️ No cached build found — use "New Runway Build" to download and install MetaMask')
+        return { ok: false, error: 'MetaMask is not installed in the Simulator. Tap "New Runway Build" to install it.' }
+      }
+    }
+
     // Relaunch MetaMask with deep link
     const bundlerUrl = encodeURIComponent('http://localhost:8081')
     await runShell(`xcrun simctl launch booted io.metamask.MetaMask 2>/dev/null || true`, log, undefined, this.env)
@@ -851,7 +973,7 @@ export class SetupRunner {
       log, undefined, this.env
     )
 
-    log('MetaMask relaunched ✓')
+    log('MetaMask launched ✓')
     return { ok: true }
   }
 

@@ -1,6 +1,6 @@
 {
   "name": "metamask-designer-setup",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "One-click MetaMask Mobile setup for designers",
   "main": "dist/main.js",
   "scripts": {
