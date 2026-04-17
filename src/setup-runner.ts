@@ -521,6 +521,13 @@ export class SetupRunner {
 
     if (!appPath) throw new Error('Could not find .app bundle in downloaded zip')
 
+    // Validate bundle ID — catches corrupted extractions before Simulator errors out
+    const bundleId = this.readBundleId(appPath)
+    if (!bundleId) {
+      throw new Error(`Downloaded build is missing bundle ID (Info.plist invalid). Try "New Runway Build" again.`)
+    }
+    log(`Build bundle ID: ${bundleId}`)
+
     log(`Installing ${path.basename(appPath)} into Simulator...`)
     await runWithLog('xcrun', ['simctl', 'install', 'booted', appPath], log, { env: this.env })
 
@@ -625,22 +632,13 @@ export class SetupRunner {
 
     if (!isInstalled) {
       log('MetaMask not found in Simulator — reinstalling from cached build...')
-      const appDir = path.join(os.tmpdir(), 'metamask-sim-app')
-      const renamedPath = path.join(os.tmpdir(), 'MetaMask.app')
-      let appPath: string | undefined
-
-      if (fs.existsSync(appDir)) {
-        appPath = require('child_process')
-          .execSync(`find "${appDir}" -name "*.app" -maxdepth 3`, { encoding: 'utf8', env: this.env })
-          .split('\n').filter(Boolean)[0]
-      }
-      if (!appPath && fs.existsSync(renamedPath)) appPath = renamedPath
+      const appPath = this.findValidCachedApp(log)
 
       if (appPath) {
         await runWithLog('xcrun', ['simctl', 'install', 'booted', appPath], log, { env: this.env })
         log('MetaMask reinstalled ✓')
       } else {
-        log('No cached build found — downloading from Runway...')
+        log('No valid cached build found — downloading fresh from Runway...')
         const buildResult = await this.downloadBuild()
         if (!buildResult.ok) return buildResult
       }
@@ -942,25 +940,15 @@ export class SetupRunner {
 
     if (!isInstalled) {
       log('MetaMask not found in Simulator — reinstalling from cached build...')
-      // Look for the cached .app in tmp
-      const appDir = path.join(os.tmpdir(), 'metamask-sim-app')
-      const renamedPath = path.join(os.tmpdir(), 'MetaMask.app')
-      let appPath: string | undefined
-
-      if (fs.existsSync(appDir)) {
-        appPath = require('child_process')
-          .execSync(`find "${appDir}" -name "*.app" -maxdepth 3`, { encoding: 'utf8', env: this.env })
-          .split('\n').filter(Boolean)[0]
-      }
-      if (!appPath && fs.existsSync(renamedPath)) appPath = renamedPath
+      const appPath = this.findValidCachedApp(log)
 
       if (appPath) {
         log(`Reinstalling ${path.basename(appPath)}...`)
         await runWithLog('xcrun', ['simctl', 'install', 'booted', appPath], log, { env: this.env })
         log('MetaMask reinstalled ✓')
       } else {
-        log('⚠️ No cached build found — use "New Runway Build" to download and install MetaMask')
-        return { ok: false, error: 'MetaMask is not installed in the Simulator. Tap "New Runway Build" to install it.' }
+        log('⚠️ No valid cached build found — tap "New Runway Build" to download and install MetaMask')
+        return { ok: false, error: 'MetaMask is not installed in the Simulator. Tap "New Runway Build" to download and install it.' }
       }
     }
 
@@ -1005,6 +993,47 @@ export class SetupRunner {
         return { ok: false, error: e instanceof Error ? e.message : String(e) }
       }
     }
+  }
+
+  /** Returns path to a valid cached .app bundle, or undefined if none is usable.
+   *  Validates by reading CFBundleIdentifier — catches the "Missing bundle ID" case
+   *  where the cached .app has a corrupted or incomplete Info.plist. */
+  private findValidCachedApp(log: (msg: string) => void): string | undefined {
+    const appDir = path.join(os.tmpdir(), 'metamask-sim-app')
+    const renamedPath = path.join(os.tmpdir(), 'MetaMask.app')
+    const candidates: string[] = []
+
+    if (fs.existsSync(appDir)) {
+      try {
+        const found = require('child_process')
+          .execSync(`find "${appDir}" -name "*.app" -maxdepth 3`, { encoding: 'utf8', env: this.env })
+          .split('\n').filter(Boolean)
+        candidates.push(...found)
+      } catch { /* ignore */ }
+    }
+    if (fs.existsSync(renamedPath)) candidates.push(renamedPath)
+
+    for (const candidate of candidates) {
+      const bundleId = this.readBundleId(candidate)
+      if (bundleId) return candidate
+      log(`Cached build at ${path.basename(candidate)} is invalid (no bundle ID) — ignoring`)
+      // Remove corrupt cache so next install doesn't hit the same error
+      try { fs.rmSync(candidate, { recursive: true, force: true }) } catch { /* ignore */ }
+    }
+
+    return undefined
+  }
+
+  /** Read CFBundleIdentifier from an iOS .app bundle. Returns null if missing/invalid. */
+  private readBundleId(appPath: string): string | null {
+    const plistPath = path.join(appPath, 'Info.plist')
+    if (!fs.existsSync(plistPath)) return null
+    try {
+      const out = require('child_process')
+        .execSync(`plutil -extract CFBundleIdentifier raw "${plistPath}" 2>/dev/null`, { encoding: 'utf8', env: this.env })
+        .trim()
+      return out || null
+    } catch { return null }
   }
 
   private async reloadJs(): Promise<{ ok: boolean; error?: string }> {
