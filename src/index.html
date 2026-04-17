@@ -1372,9 +1372,17 @@ function rebuildMenuState(state) {
 
 // ── Appearance toggle ──
 async function setAppearance(mode) {
-  document.getElementById('btn-dark').classList.toggle('active', mode === 'dark')
-  document.getElementById('btn-light').classList.toggle('active', mode === 'light')
-  await api.runStep('toggle-appearance', { mode })
+  const result = await api.runStep('toggle-appearance', { mode })
+  if (result.ok) {
+    document.getElementById('btn-dark').classList.toggle('active', mode === 'dark')
+    document.getElementById('btn-light').classList.toggle('active', mode === 'light')
+  } else {
+    const statusEl = document.getElementById('done-pr-status')
+    if (statusEl) {
+      statusEl.textContent = result.error || 'Could not change appearance'
+      statusEl.className = 'pr-status-msg error'
+    }
+  }
 }
 
 // ── Reload JS ──

@@ -37,6 +37,7 @@ function setupAutoUpdater() {
   })
 
   autoUpdater.on('update-available', (info) => {
+    manualCheck = false
     win?.webContents.send('app:update-available', {
       version: info.version,
       releaseNotes: info.releaseNotes,
@@ -47,6 +48,16 @@ function setupAutoUpdater() {
 
   autoUpdater.on('update-not-available', () => {
     win?.webContents.send('app:update-status', { status: 'up-to-date' })
+    if (manualCheck) {
+      manualCheck = false
+      const { dialog } = require('electron')
+      dialog.showMessageBox(win!, {
+        type: 'info',
+        buttons: ['OK'],
+        title: "You're up to date",
+        message: `MetaMask Designer Setup ${app.getVersion()} is the latest version.`,
+      })
+    }
   })
 
   autoUpdater.on('error', (err) => {
@@ -91,6 +102,22 @@ function setupAutoUpdater() {
 }
 
 let updateState = 'idle'
+let manualCheck = false
+
+function checkForUpdatesManually() {
+  manualCheck = true
+  autoUpdater.checkForUpdatesAndNotify().catch((e) => {
+    manualCheck = false
+    const { dialog } = require('electron')
+    dialog.showMessageBox(win!, {
+      type: 'warning',
+      buttons: ['OK'],
+      title: 'Update Check Failed',
+      message: 'Could not check for updates.',
+      detail: e.message,
+    })
+  })
+}
 
 function rebuildMenu() {
   const checkLabel = updateState === 'downloading'
@@ -111,7 +138,7 @@ function rebuildMenu() {
             if (updateState === 'ready') {
               autoUpdater.quitAndInstall()
             } else {
-              autoUpdater.checkForUpdatesAndNotify().catch(() => {})
+              checkForUpdatesManually()
             }
           },
         },

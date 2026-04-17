@@ -856,14 +856,32 @@ export class SetupRunner {
   }
 
   private toggleAppearance(mode: string): { ok: boolean; error?: string } {
+    const appearance = mode === 'light' ? 'light' : 'dark'
     try {
+      // Try "booted" first — works when a simulator is running
       require('child_process').execSync(
-        `xcrun simctl ui booted appearance ${mode === 'light' ? 'light' : 'dark'}`,
-        { env: this.env, stdio: 'ignore' }
+        `xcrun simctl ui booted appearance ${appearance}`,
+        { env: this.env, stdio: 'pipe' }
       )
       return { ok: true }
-    } catch (e: unknown) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) }
+    } catch {
+      // Fallback: find any booted device UDID and target it directly
+      try {
+        const output = require('child_process').execSync(
+          `xcrun simctl list devices booted -j`,
+          { encoding: 'utf8', env: this.env }
+        )
+        const devices = JSON.parse(output).devices as Record<string, any[]>
+        const booted = Object.values(devices).flat().find((d: any) => d.state === 'Booted')
+        if (!booted) return { ok: false, error: 'No simulator is running. Launch MetaMask first.' }
+        require('child_process').execSync(
+          `xcrun simctl ui ${booted.udid} appearance ${appearance}`,
+          { env: this.env, stdio: 'pipe' }
+        )
+        return { ok: true }
+      } catch (e: unknown) {
+        return { ok: false, error: e instanceof Error ? e.message : String(e) }
+      }
     }
   }
 
