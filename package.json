@@ -1,6 +1,6 @@
 {
   "name": "metamask-designer-setup",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "One-click MetaMask Mobile setup for designers",
   "main": "dist/main.js",
   "scripts": {
@@ -27,7 +27,9 @@
       "gatekeeperAssess": false,
       "entitlements": "entitlements.plist",
       "entitlementsInherit": "entitlements.plist",
-      "notarize": { "teamId": "2WRVG46HV2" }
+      "notarize": {
+        "teamId": "2WRVG46HV2"
+      }
     },
     "dmg": {
       "title": "MetaMask Designer Setup",
@@ -64,15 +66,13 @@
     }
   },
   "dependencies": {
-    "electron-updater": "^6.0.0"
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.8.3"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "electron": "^30.0.0",
     "electron-builder": "^24.0.0",
     "typescript": "^5.4.0"
-  },
-  "dependencies": {
-    "electron-updater": "^6.8.3"
   }
 }

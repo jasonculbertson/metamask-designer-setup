@@ -15,13 +15,16 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('setup:log', logHandler)
     ipcRenderer.on('setup:error', errorHandler)
     ipcRenderer.on('setup:bundler-crashed', crashHandler)
+    const updateStatusHandler = (_: Electron.IpcRendererEvent, data: unknown) => cb('update-status', data)
     ipcRenderer.on('app:update-available', updateHandler)
+    ipcRenderer.on('app:update-status', updateStatusHandler)
     return () => {
       ipcRenderer.removeListener('setup:progress', handler)
       ipcRenderer.removeListener('setup:log', logHandler)
       ipcRenderer.removeListener('setup:error', errorHandler)
       ipcRenderer.removeListener('setup:bundler-crashed', crashHandler)
       ipcRenderer.removeListener('app:update-available', updateHandler)
+      ipcRenderer.removeListener('app:update-status', updateStatusHandler)
     }
   },
 })

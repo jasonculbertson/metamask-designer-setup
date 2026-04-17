@@ -735,34 +735,31 @@ export class SetupRunner {
       }
     } catch { /* not shallow or git error — continue */ }
 
-    // Stash any local changes so checkout never fails due to a dirty tree
+    // Discard any local changes — force clean slate before switching
     try {
-      const status = exec('git status --porcelain')
-      if (status) {
-        log('Stashing local changes...')
-        await runWithLog('git', ['stash', 'push', '--include-untracked', '-m', 'metamask-designer-setup auto-stash'], log, { cwd: REPO_DIR, env: this.env })
-          .catch(() => runWithLog('git', ['checkout', '--', '.'], log, { cwd: REPO_DIR, env: this.env }))
-      }
+      await runWithLog('git', ['reset', '--hard', 'HEAD'], log, { cwd: REPO_DIR, env: this.env })
+      await runWithLog('git', ['clean', '-fd'], log, { cwd: REPO_DIR, env: this.env })
     } catch { /* ignore */ }
 
-    log(`Fetching remote branches...`)
-    await runWithLog('git', ['fetch', 'origin', '--prune', '--no-tags'], log, { cwd: REPO_DIR, env: this.env })
-      .catch((e: Error) => { throw new Error(`fetch failed: ${e.message}`) })
+    // Fetch ONLY the specific branch by name — this is the key fix for shallow clones.
+    // `git fetch origin` on a shallow clone only updates the default branch (main),
+    // so `origin/<branch>` never exists for PR branches. Fetching by name always works.
+    log(`Fetching branch "${branch}" from GitHub...`)
+    await runWithLog('git', ['fetch', 'origin', `${branch}:refs/remotes/origin/${branch}`, '--update-shallow'], log, { cwd: REPO_DIR, env: this.env })
+      .catch(() =>
+        // Fallback without --update-shallow for non-shallow repos
+        runWithLog('git', ['fetch', 'origin', `${branch}:refs/remotes/origin/${branch}`], log, { cwd: REPO_DIR, env: this.env })
+      )
+      .catch((e: Error) => { throw new Error(`Could not fetch branch "${branch}" from GitHub — is the PR still open? (${e.message})`) })
 
     log(`Switching to ${branch}...`)
-    const switched = await runWithLog('git', ['checkout', '-f', branch], log, { cwd: REPO_DIR, env: this.env })
-      .then(() => true)
-      .catch(() => false)
-
-    if (!switched) {
-      // Branch doesn't exist locally — create tracking branch from origin
-      await runWithLog('git', ['checkout', '-f', '-b', branch, `origin/${branch}`], log, { cwd: REPO_DIR, env: this.env })
-        .catch((e: Error) => { throw new Error(`checkout failed — branch "${branch}" not found on origin. ${e.message}`) })
-    }
+    // -B creates or resets the branch to track origin/<branch>
+    await runWithLog('git', ['checkout', '-B', branch, `origin/${branch}`], log, { cwd: REPO_DIR, env: this.env })
+      .catch((e: Error) => { throw new Error(`Could not switch to "${branch}": ${e.message}`) })
 
     log('Pulling latest...')
     await runWithLog('git', ['pull', '--ff-only'], log, { cwd: REPO_DIR, env: this.env })
-      .catch(() => { log('Pull skipped (detached HEAD or no upstream)') })
+      .catch(() => { log('Already up to date') })
 
     log('Reinstalling dependencies...')
     await runWithLog('yarn', ['install'], log, { cwd: REPO_DIR, env: this.env })

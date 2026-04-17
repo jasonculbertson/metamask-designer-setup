@@ -883,11 +883,9 @@ api.onProgress((type, data) => {
     const banner = document.getElementById('crash-banner')
     if (banner && currentScreen === 'done') banner.classList.add('visible')
   } else if (type === 'update-available') {
-    const banner = document.getElementById('update-banner')
-    if (banner) {
-      banner.textContent = 'Update v' + data.version + ' available — it will install automatically on next restart.'
-      banner.classList.add('visible')
-    }
+    showUpdateBanner('available', data.version)
+  } else if (type === 'update-status') {
+    handleUpdateStatus(data)
   }
 })
 
@@ -1337,6 +1335,39 @@ async function doRestartServer() {
       statusEl.className = 'pr-status-msg error'
     }
   }
+}
+
+// ── Auto-update UI ──
+function showUpdateBanner(status, version) {
+  const banner = document.getElementById('update-banner')
+  if (!banner) return
+  if (status === 'available') {
+    banner.textContent = `v${version} is available — downloading in background…`
+    banner.classList.add('visible')
+  } else if (status === 'downloading') {
+    banner.textContent = `Downloading update… ${version}%`
+    banner.classList.add('visible')
+  } else if (status === 'ready') {
+    banner.innerHTML = `Update ready — <a href="#" onclick="event.preventDefault(); api.runStep('noop')" style="color:#93bbfc">restart to install</a>`
+    banner.classList.add('visible')
+    api.onProgress(() => {}) // keep listener alive
+    window.__updateReady = true
+    rebuildMenuState('ready')
+  } else if (status === 'up-to-date') {
+    banner.textContent = ''
+    banner.classList.remove('visible')
+  }
+}
+
+function handleUpdateStatus(data) {
+  if (data.status === 'available') showUpdateBanner('available', data.version)
+  else if (data.status === 'downloading') showUpdateBanner('downloading', data.percent)
+  else if (data.status === 'ready') showUpdateBanner('ready', '')
+  else if (data.status === 'up-to-date') showUpdateBanner('up-to-date', '')
+}
+
+function rebuildMenuState(state) {
+  try { window.api && ipcRenderer?.send('update-state-changed', state) } catch { /* ignore */ }
 }
 
 // ── Appearance toggle ──
