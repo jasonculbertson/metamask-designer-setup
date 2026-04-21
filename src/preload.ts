@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('api', {
   runStep: (stepId: string, payload?: Record<string, string>) =>
     ipcRenderer.invoke('run-step', stepId, payload),
   getState: () => ipcRenderer.invoke('get-state'),
+  getVersion: () => ipcRenderer.invoke('get-version'),
   onProgress: (cb: (event: string, data: unknown) => void) => {
     const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb('progress', data)
     const logHandler = (_: Electron.IpcRendererEvent, data: unknown) => cb('log', data)

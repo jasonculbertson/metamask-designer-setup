@@ -4,11 +4,19 @@ One-click app for designers to run **MetaMask Mobile** in the iOS Simulator — 
 
 ## Download
 
-**[Download v1.0.7 (Apple Silicon)](https://github.com/jasonculbertson/metamask-designer-setup/releases/download/v1.0.7/MetaMask.Designer.Setup-1.0.7-arm64.dmg)**
+**[Download v1.0.8 (Apple Silicon)](https://github.com/jasonculbertson/metamask-designer-setup/releases/download/v1.0.8/MetaMask.Designer.Setup-1.0.8-arm64.dmg)**
 
 Requires an Apple Silicon Mac (M1/M2/M3 or later) running macOS.
 
 ---
+
+## What's in v1.0.8
+
+- **Version number** — shown in the top-right corner of every screen
+- **Update status banner** — now visible on every screen, not just the done screen
+- **Checking state** — clicking "Check for Updates" immediately shows "Checking for updates…"
+- **"You're on the latest version ✓"** — appears briefly (4 seconds) then fades when already up to date
+- **Error state** — update failures now shown in the UI, not silently dropped
 
 ## What's in v1.0.7
 

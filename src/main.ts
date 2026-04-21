@@ -202,3 +202,5 @@ ipcMain.handle('get-state', async () => {
   if (!runner) return {}
   return runner.getState()
 })
+
+ipcMain.handle('get-version', () => app.getVersion())

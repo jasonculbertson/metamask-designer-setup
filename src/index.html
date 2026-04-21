@@ -24,6 +24,7 @@
       align-items: center;
       padding: 0 20px;
       flex-shrink: 0;
+      position: relative;
     }
 
     .logo {
@@ -616,20 +617,31 @@
 
     .crash-banner button:hover { background: #ff444433; }
 
-    /* Update banner */
+    /* Update banner — global, sits below titlebar */
     .update-banner {
-      background: #60a5fa1a;
-      border: 1px solid #60a5fa33;
-      border-radius: 10px;
-      padding: 10px 16px;
       font-size: 12px;
-      color: #60a5fa;
-      display: none;
       text-align: center;
-      margin-bottom: 8px;
+      padding: 7px 20px;
+      display: none;
+      border-bottom: 1px solid transparent;
+      flex-shrink: 0;
     }
-
     .update-banner.visible { display: block; }
+    .update-banner.state-checking  { background: #1a1a1a; color: #666; border-color: #2a2a2a; }
+    .update-banner.state-available  { background: #60a5fa1a; color: #60a5fa; border-color: #60a5fa33; }
+    .update-banner.state-downloading { background: #60a5fa1a; color: #60a5fa; border-color: #60a5fa33; }
+    .update-banner.state-ready      { background: #34d39920; color: #34d399; border-color: #34d39933; }
+    .update-banner.state-up-to-date { background: #34d39910; color: #34d399; border-color: #34d39922; }
+    .update-banner.state-error      { background: #ff444420; color: #ff8888; border-color: #ff444430; }
+
+    /* Version badge in titlebar */
+    .version-badge {
+      position: absolute;
+      right: 20px;
+      font-size: 11px;
+      color: #444;
+      -webkit-app-region: no-drag;
+    }
   </style>
 </head>
 <body>
@@ -642,7 +654,11 @@
     </svg>
     <span class="logo-text">MetaMask Designer Setup</span>
   </div>
+  <span class="version-badge" id="version-badge"></span>
 </div>
+
+<!-- Global update status banner — visible on every screen -->
+<div class="update-banner" id="update-banner"></div>
 
 <div class="content">
 
@@ -810,7 +826,6 @@
 
   <!-- ── Screen: Done ── -->
   <div class="screen" id="screen-done">
-    <div class="update-banner" id="update-banner"></div>
     <div class="done-body" style="justify-content:flex-start; padding-top:24px;">
       <div class="done-check">✓</div>
       <div class="welcome-title">You're all set!</div>
@@ -864,6 +879,12 @@ if (!api) {
 // ── State ──
 let state = {}
 let currentScreen = 'welcome'
+
+// ── Version badge ──
+api.getVersion().then(v => {
+  const el = document.getElementById('version-badge')
+  if (el) el.textContent = 'v' + v
+})
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
@@ -1351,30 +1372,54 @@ async function doRestartServer() {
 }
 
 // ── Auto-update UI ──
-function showUpdateBanner(status, version) {
+let _upToDateTimer = null
+function showUpdateBanner(status, value) {
   const banner = document.getElementById('update-banner')
   if (!banner) return
-  if (status === 'available') {
-    banner.textContent = `v${version} is available — downloading in background…`
-    banner.classList.add('visible')
+  if (_upToDateTimer) { clearTimeout(_upToDateTimer); _upToDateTimer = null }
+  // Clear all state classes
+  banner.classList.remove('state-checking','state-available','state-downloading','state-ready','state-up-to-date','state-error')
+
+  if (status === 'checking') {
+    banner.textContent = 'Checking for updates…'
+    banner.classList.add('visible', 'state-checking')
+  } else if (status === 'available') {
+    banner.textContent = `v${value} is available — downloading in background…`
+    banner.classList.add('visible', 'state-available')
   } else if (status === 'downloading') {
-    banner.textContent = `Downloading update… ${version}%`
-    banner.classList.add('visible')
+    banner.textContent = `Downloading update… ${value}%`
+    banner.classList.add('visible', 'state-downloading')
   } else if (status === 'ready') {
-    banner.innerHTML = `Update ready — quit and reopen the app to install`
-    banner.classList.add('visible')
+    banner.textContent = 'Update ready — quit and reopen to install'
+    banner.classList.add('visible', 'state-ready')
     window.__updateReady = true
   } else if (status === 'up-to-date') {
-    banner.textContent = ''
+    banner.textContent = `You're on the latest version ✓`
+    banner.classList.add('visible', 'state-up-to-date')
+    _upToDateTimer = setTimeout(() => {
+      banner.classList.remove('visible')
+      banner.textContent = ''
+    }, 4000)
+  } else if (status === 'error') {
+    banner.textContent = `Update check failed — check your internet connection`
+    banner.classList.add('visible', 'state-error')
+    _upToDateTimer = setTimeout(() => {
+      banner.classList.remove('visible')
+      banner.textContent = ''
+    }, 6000)
+  } else {
     banner.classList.remove('visible')
+    banner.textContent = ''
   }
 }
 
 function handleUpdateStatus(data) {
-  if (data.status === 'available') showUpdateBanner('available', data.version)
+  if (data.status === 'checking')    showUpdateBanner('checking', '')
+  else if (data.status === 'available')   showUpdateBanner('available', data.version)
   else if (data.status === 'downloading') showUpdateBanner('downloading', data.percent)
-  else if (data.status === 'ready') showUpdateBanner('ready', '')
-  else if (data.status === 'up-to-date') showUpdateBanner('up-to-date', '')
+  else if (data.status === 'ready')       showUpdateBanner('ready', '')
+  else if (data.status === 'up-to-date')  showUpdateBanner('up-to-date', '')
+  else if (data.status === 'error')       showUpdateBanner('error', data.message)
 }
 
 // ── Appearance toggle ──
