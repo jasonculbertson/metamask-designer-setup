@@ -4,11 +4,15 @@ One-click app for designers to run **MetaMask Mobile** in the iOS Simulator — 
 
 ## Download
 
-**[Download v1.0.6 (Apple Silicon)](https://github.com/jasonculbertson/metamask-designer-setup/releases/download/v1.0.6/MetaMask.Designer.Setup-1.0.6-arm64.dmg)**
+**[Download v1.0.7 (Apple Silicon)](https://github.com/jasonculbertson/metamask-designer-setup/releases/download/v1.0.7/MetaMask.Designer.Setup-1.0.7-arm64.dmg)**
 
 Requires an Apple Silicon Mac (M1/M2/M3 or later) running macOS.
 
 ---
+
+## What's in v1.0.7
+
+- **Fixed: Auto-updater now works correctly** — v1.0.6 was missing the `latest-mac.yml` file needed for in-app update checks; this release includes it
 
 ## What's in v1.0.6
 
