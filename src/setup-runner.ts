@@ -759,10 +759,15 @@ export class SetupRunner {
     const branch = pr.head?.ref
     if (!branch) return { ok: false, error: 'Could not determine branch for this PR' }
 
+    if (pr.state === 'closed') {
+      const reason = pr.merged_at ? 'merged' : 'closed'
+      return { ok: false, error: `PR #${prNumber} is already ${reason}. Only open PRs can be checked out.` }
+    }
+
     log(`PR #${prNumber}: ${pr.title}`)
     log(`Branch: ${branch} by ${pr.user?.login}`)
 
-    return await this.switchBranchInternal(branch, {
+    return await this.switchBranchInternal(branch, prNumber, {
       number: pr.number,
       title: pr.title,
       author: pr.user?.login ?? '',
@@ -772,11 +777,12 @@ export class SetupRunner {
 
   private async switchBranch(branch: string): Promise<{ ok: boolean; error?: string }> {
     if (!branch) return { ok: false, error: 'No branch specified' }
-    return await this.switchBranchInternal(branch, null)
+    return await this.switchBranchInternal(branch, null, null)
   }
 
   private async switchBranchInternal(
     branch: string,
+    prNumber: number | null,
     prInfo: { number: number; title: string; author: string; branch: string } | null
   ): Promise<{ ok: boolean; error?: string }> {
     const log = this.log.bind(this)
@@ -814,12 +820,29 @@ export class SetupRunner {
     // `git fetch origin` on a shallow clone only updates the default branch (main),
     // so `origin/<branch>` never exists for PR branches. Fetching by name always works.
     log(`Fetching branch "${branch}" from GitHub...`)
-    await runWithLog('git', ['fetch', 'origin', `${branch}:refs/remotes/origin/${branch}`, '--update-shallow'], log, { cwd: REPO_DIR, env: this.env })
-      .catch(() =>
-        // Fallback without --update-shallow for non-shallow repos
-        runWithLog('git', ['fetch', 'origin', `${branch}:refs/remotes/origin/${branch}`], log, { cwd: REPO_DIR, env: this.env })
-      )
-      .catch((e: Error) => { throw new Error(`Could not fetch branch "${branch}" from GitHub — is the PR still open? (${e.message})`) })
+
+    // Collect stderr from git for better error messages
+    const fetchErrors: string[] = []
+    const captureLog = (msg: string) => { fetchErrors.push(msg); log(msg) }
+
+    const fetchByBranch = () =>
+      runWithLog('git', ['fetch', 'origin', `${branch}:refs/remotes/origin/${branch}`, '--update-shallow'], captureLog, { cwd: REPO_DIR, env: this.env })
+        .catch(() =>
+          runWithLog('git', ['fetch', 'origin', `${branch}:refs/remotes/origin/${branch}`], captureLog, { cwd: REPO_DIR, env: this.env })
+        )
+
+    // If we have a PR number, also try fetching via refs/pull/<n>/head as fallback
+    // (works even if the branch was deleted or renamed)
+    const fetchByPrRef = () => prNumber
+      ? runWithLog('git', ['fetch', 'origin', `refs/pull/${prNumber}/head:refs/remotes/origin/${branch}`], captureLog, { cwd: REPO_DIR, env: this.env })
+      : Promise.reject(new Error('No PR number'))
+
+    await fetchByBranch()
+      .catch(() => fetchByPrRef())
+      .catch((e: Error) => {
+        const gitDetail = fetchErrors.filter(l => l.toLowerCase().includes('error') || l.toLowerCase().includes('fatal')).join(' ') || e.message
+        throw new Error(`Could not fetch branch "${branch}" from GitHub.\n${gitDetail}`)
+      })
 
     log(`Switching to ${branch}...`)
     // -B creates or resets the branch to track origin/<branch>
