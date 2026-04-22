@@ -854,13 +854,13 @@ export class SetupRunner {
       .catch(() => { log('Already up to date') })
 
     log('Reinstalling dependencies...')
-    await runWithLog('yarn', ['install', '--ignore-engines', '--network-timeout', '120000'], log, { cwd: REPO_DIR, env: this.env })
+    await runWithLog('yarn', ['install'], log, { cwd: REPO_DIR, env: this.env })
       .catch(() => {
         log('First install attempt failed, retrying...')
-        return runWithLog('yarn', ['install', '--ignore-engines', '--network-timeout', '120000'], log, { cwd: REPO_DIR, env: this.env })
+        return runWithLog('yarn', ['install'], log, { cwd: REPO_DIR, env: this.env })
       })
       .catch((e: Error) => {
-        throw new Error(`This PR has dependency conflicts that prevented installation (${e.message}). Ask a developer to resolve the yarn errors on this branch.`)
+        throw new Error(`Dependency installation failed (${e.message}). Check the log above for details.`)
       })
 
     this.state.currentBranch = branch
