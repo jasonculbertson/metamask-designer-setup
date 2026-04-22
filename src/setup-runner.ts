@@ -761,7 +761,7 @@ export class SetupRunner {
 
     if (pr.state === 'closed') {
       const reason = pr.merged_at ? 'merged' : 'closed'
-      return { ok: false, error: `PR #${prNumber} is already ${reason}. Only open PRs can be checked out.` }
+      log(`Note: PR #${prNumber} is ${reason} — checking out the snapshot at time of ${reason}...`)
     }
 
     log(`PR #${prNumber}: ${pr.title}`)
@@ -854,7 +854,14 @@ export class SetupRunner {
       .catch(() => { log('Already up to date') })
 
     log('Reinstalling dependencies...')
-    await runWithLog('yarn', ['install'], log, { cwd: REPO_DIR, env: this.env })
+    await runWithLog('yarn', ['install', '--ignore-engines', '--network-timeout', '120000'], log, { cwd: REPO_DIR, env: this.env })
+      .catch(() => {
+        log('First install attempt failed, retrying...')
+        return runWithLog('yarn', ['install', '--ignore-engines', '--network-timeout', '120000'], log, { cwd: REPO_DIR, env: this.env })
+      })
+      .catch((e: Error) => {
+        throw new Error(`This PR has dependency conflicts that prevented installation (${e.message}). Ask a developer to resolve the yarn errors on this branch.`)
+      })
 
     this.state.currentBranch = branch
     this.state.currentPr = prInfo
