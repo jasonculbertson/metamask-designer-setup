@@ -403,6 +403,19 @@
     .pr-go-btn:hover:not(:disabled) { opacity: 0.9; }
     .pr-go-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+    .pr-switch-log {
+      font-size: 11px;
+      color: #555;
+      font-family: 'SF Mono', monospace;
+      max-height: 80px;
+      overflow-y: auto;
+      margin: 4px 0 0;
+      line-height: 1.5;
+      display: none;
+    }
+    .pr-switch-log.visible { display: block; }
+    .pr-switch-log .log-err { color: #ff7777; }
+
     .pr-status-msg {
       font-size: 12px;
       color: #22c55e;
@@ -838,6 +851,7 @@
         </div>
         <div class="pr-preview" id="done-pr-preview"></div>
         <div class="pr-status-msg" id="done-pr-status"></div>
+        <div class="pr-switch-log" id="done-pr-switch-log"></div>
         <div class="pr-filters" id="done-pr-filters"></div>
         <div class="pr-list-label">Recent open PRs</div>
         <div class="pr-list" id="done-pr-list"><div style="color:#555; font-size:12px; padding:8px;">Loading...</div></div>
@@ -1277,20 +1291,38 @@ async function switchToPr(prefix) {
   const input = document.getElementById(prefix + '-pr-input')
   const goBtn = document.getElementById(prefix + '-pr-go')
   const statusEl = document.getElementById(prefix + '-pr-status')
+  const switchLog = document.getElementById(prefix + '-pr-switch-log')
   const val = input.value.trim()
 
   if (!val) return
 
+  // Show inline log panel and clear it
+  if (switchLog) { switchLog.innerHTML = ''; switchLog.classList.add('visible') }
+
+  // Route log events to inline panel during this switch
+  const logListener = (type, data) => {
+    if (type !== 'log' || !switchLog) return
+    const line = document.createElement('div')
+    const txt = String(data)
+    line.className = txt.toLowerCase().includes('error') || txt.toLowerCase().includes('fatal') || txt.toLowerCase().includes('warn') ? 'log-err' : ''
+    line.textContent = '› ' + txt
+    switchLog.appendChild(line)
+    switchLog.scrollTop = switchLog.scrollHeight
+  }
+  const cleanup = api.onProgress(logListener)
+
   // Disable all action buttons during switch to prevent concurrent operations
   setActionButtonsDisabled(true)
-  statusEl.textContent = 'Switching to PR... (fetching, checkout, yarn install)'
+  statusEl.textContent = 'Switching...'
   statusEl.className = 'pr-status-msg'
 
   const result = await api.runStep('switch-to-pr', { pr: val })
 
+  if (cleanup) cleanup()
   setActionButtonsDisabled(false)
 
   if (result.ok) {
+    if (switchLog) switchLog.classList.remove('visible')
     state = await api.getState()
     updateCurrentLabel(prefix)
     input.value = ''
@@ -1307,6 +1339,7 @@ async function switchToPr(prefix) {
   } else {
     statusEl.textContent = 'Switch failed: ' + (result.error || '')
     statusEl.className = 'pr-status-msg error'
+    // Leave log visible so user can see what went wrong
   }
 }
 
