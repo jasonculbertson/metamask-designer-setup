@@ -12,6 +12,9 @@ Requires an Apple Silicon Mac (M1/M2/M3 or later) running macOS.
 
 ## What's in v1.0.8
 
+- **Fixed: PR switching now works** — invalid Yarn v1 flags were causing every single PR switch to fail on this Yarn v4 repo
+- **Fixed: Merged/closed PRs** — shows a warning and proceeds instead of hard-blocking
+- **Fixed: PR switch errors are now visible** — live log panel shows below the PR input during switching so you can see exactly what's happening
 - **Version number** — shown in the top-right corner of every screen
 - **Update status banner** — now visible on every screen, not just the done screen
 - **Checking state** — clicking "Check for Updates" immediately shows "Checking for updates…"
